@@ -1,27 +1,26 @@
-# IntelliJ / Android Studio
-*.iml
-.idea/caches/
-.idea/libraries/
-.idea/modules.xml
-.idea/workspace.xml
-.idea/navEditor.xml
-.idea/assetWizardSettings.xml
-
-# Gradle / local machine
 .gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
 local.properties
 
-# Build outputs
-**/build/
+.kotlin/
+
+.idea/
+*.iml
+
 /captures/
 .externalNativeBuild/
 .cxx/
 
-# Signing artifacts (do not commit private keys)
 *.jks
 *.keystore
 
-# OS files
+*.log
+
 .DS_Store
+.AppleDouble
+.LSOverride
+
 Thumbs.db
 Desktop.ini
