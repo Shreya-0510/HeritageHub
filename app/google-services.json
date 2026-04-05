@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "192024124632",
+    "project_id": "heritagehub-143dc",
+    "storage_bucket": "heritagehub-143dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:192024124632:android:04d2020508124a8d61cbad",
+        "android_client_info": {
+          "package_name": "com.example.heritagehub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5pHpAsng5J6vdDKVs6S21yeikJ771TPc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
