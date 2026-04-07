@@ -12,6 +12,7 @@ class AuthViewModel : ViewModel() {
     val isLoading = mutableStateOf(false)
     val error = mutableStateOf<String?>(null)
     val isAuthenticated = mutableStateOf(false)
+    val userRole = mutableStateOf<String?>(null)
 
     fun login(email: String, password: String, onSuccess: () -> Unit) {
         if (email.isEmpty() || password.isEmpty()) {
@@ -23,10 +24,22 @@ class AuthViewModel : ViewModel() {
         error.value = null
 
         auth.signInWithEmailAndPassword(email, password)
-            .addOnSuccessListener {
-                isLoading.value = false
-                isAuthenticated.value = true
-                onSuccess()
+            .addOnSuccessListener { result ->
+                val userId = result.user?.uid ?: return@addOnSuccessListener
+                // Fetch user role from Firestore
+                firestore.collection("users").document(userId)
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val role = document.getString("role") ?: "user"
+                        userRole.value = role
+                        isLoading.value = false
+                        isAuthenticated.value = true
+                        onSuccess()
+                    }
+                    .addOnFailureListener { exception ->
+                        isLoading.value = false
+                        error.value = exception.message ?: "Failed to fetch user data"
+                    }
             }
             .addOnFailureListener { exception ->
                 isLoading.value = false
@@ -60,6 +73,7 @@ class AuthViewModel : ViewModel() {
                 firestore.collection("users").document(userId)
                     .set(userData)
                     .addOnSuccessListener {
+                        userRole.value = role
                         isLoading.value = false
                         isAuthenticated.value = true
                         onSuccess()
@@ -78,11 +92,24 @@ class AuthViewModel : ViewModel() {
     fun logout() {
         auth.signOut()
         isAuthenticated.value = false
+        userRole.value = null
         error.value = null
     }
 
     fun checkAuthStatus() {
         isAuthenticated.value = auth.currentUser != null
+        if (isAuthenticated.value) {
+            // Fetch user role on app startup
+            val userId = auth.currentUser?.uid ?: return
+            firestore.collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    userRole.value = document.getString("role") ?: "user"
+                }
+                .addOnFailureListener {
+                    userRole.value = "user" // Default to user role if fetch fails
+                }
+        }
     }
 }
 
