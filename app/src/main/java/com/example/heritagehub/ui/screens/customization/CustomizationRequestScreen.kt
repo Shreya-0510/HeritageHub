@@ -1,3 +1,4 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.customization
 
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +28,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import com.example.heritagehub.model.CustomizationRequest
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +53,9 @@ fun CustomizationRequestScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    val firestore = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
 
     // Form state
     val description = remember { mutableStateOf("") }
@@ -64,7 +71,7 @@ fun CustomizationRequestScreen(
                 title = { Text("Request Customization") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -120,29 +127,39 @@ fun CustomizationRequestScreen(
                         if (validateForm(description.value, budget.value, deadline.value)) {
                             isSubmitting.value = true
                             scope.launch {
-                                // Simulate API call
-                                @Suppress("UNUSED_VARIABLE")
-                                fun createRequest() = CustomizationRequest(
-                                    artistName = artistName,
-                                    description = description.value,
-                                    budget = budget.value,
-                                    deadline = deadline.value
-                                )
-                                createRequest()
-                                // Simulate delay
-                                kotlinx.coroutines.delay(1000)
+                                try {
+                                    val userId = auth.currentUser?.uid ?: return@launch
 
-                                // Show success
-                                snackbarHostState.showSnackbar(
-                                    message = "Customization request submitted successfully!",
-                                    duration = SnackbarDuration.Short
-                                )
-                                submissionSuccess.value = true
-                                isSubmitting.value = false
+                                    val request = mapOf(
+                                        "artistName" to artistName,
+                                        "description" to description.value,
+                                        "budget" to budget.value,
+                                        "deadline" to deadline.value,
+                                        "userId" to userId,
+                                        "status" to "pending",
+                                        "createdAt" to System.currentTimeMillis()
+                                    )
 
-                                // Navigate back after brief delay
-                                kotlinx.coroutines.delay(500)
-                                onBack()
+                                    firestore.collection("customization_requests")
+                                        .add(request)
+                                        .await()
+
+                                    snackbarHostState.showSnackbar(
+                                        message = "Customization request submitted successfully!",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    submissionSuccess.value = true
+                                    isSubmitting.value = false
+
+                                    kotlinx.coroutines.delay(500)
+                                    onBack()
+                                } catch (e: Exception) {
+                                    isSubmitting.value = false
+                                    snackbarHostState.showSnackbar(
+                                        message = "Error: ${e.message ?: "Failed to submit request"}",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
                             }
                         } else {
                             scope.launch {

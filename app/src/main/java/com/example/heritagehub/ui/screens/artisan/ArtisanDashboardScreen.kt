@@ -1,5 +1,7 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.artisan
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,12 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,16 +28,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.heritagehub.model.Artwork
 import com.example.heritagehub.ui.components.ArtworkCard
+import com.example.heritagehub.ui.components.ShimmerArtworkList
+import com.example.heritagehub.ui.components.ShimmerRequestList
 import com.example.heritagehub.viewmodel.AuthViewModel
+import com.example.heritagehub.viewmodel.ArtisanViewModel
 
-// Dummy data for artisan dashboard
+// ...existing code...
 private fun getDummyArtworks(): List<Artwork> {
     return listOf(
         Artwork(
@@ -119,11 +126,19 @@ data class CustomizationRequestItem(
 @Composable
 fun ArtisanDashboardScreen(
     viewModel: AuthViewModel,
+    context: Context? = null,
     onLogout: () -> Unit,
     onAddArtworkClick: () -> Unit = {}
 ) {
-    val artworks = getDummyArtworks()
+    val artisanViewModel: ArtisanViewModel = viewModel()
+    val artworks = artisanViewModel.artworks.value
+    val isLoading = artisanViewModel.isLoading.value
     val requests = getDummyRequests()
+
+    // Refresh artworks when screen is displayed (e.g., when returning from AddArtworkScreen)
+    LaunchedEffect(Unit) {
+        artisanViewModel.refreshArtworks()
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -138,11 +153,13 @@ fun ArtisanDashboardScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        viewModel.logout()
+                        if (context != null) {
+                            viewModel.logout(context)
+                        }
                         onLogout()
                     }) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ExitToApp,
+                            Icons.Default.ExitToApp,
                             contentDescription = "Logout",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -155,100 +172,159 @@ fun ArtisanDashboardScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Padding for top section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+        if (isLoading) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Your Artworks",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                item {
+                    ShimmerArtworkList(count = 4)
+                }
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Padding for top section
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-            // Your Artworks Section Title
-            item {
-                Text(
-                    text = "Your Artworks",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
+                // Your Artworks Section Title
+                item {
+                    Text(
+                        text = "Your Artworks",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
 
-            // Artwork Grid Items
-            items(artworks.chunked(2)) { rowArtworks ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    rowArtworks.forEach { artwork ->
-                        ArtworkCard(
-                            artwork = artwork,
-                            onClick = { /* Handle artwork click */ },
+                // Empty state or artwork items
+                if (artworks.isEmpty()) {
+                    item {
+                        Column(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(200.dp)
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "No artworks yet",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            Text(
+                                text = "Click 'Add Artwork' to showcase your creations",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    }
+                } else {
+                    // Artwork Grid Items
+                    items(artworks.chunked(2)) { rowArtworks ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowArtworks.forEach { artwork ->
+                                ArtworkCard(
+                                    artwork = artwork,
+                                    onClick = { /* Handle artwork click */ },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(200.dp)
+                                )
+                            }
+                            // Add spacer if odd number of items
+                            if (rowArtworks.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Incoming Requests Section Title
+                item {
+                    Text(
+                        text = "Incoming Requests",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                // Request Cards
+                if (requests.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No requests yet",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                         )
                     }
-                    // Add spacer if odd number of items
-                    if (rowArtworks.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
+                } else {
+                    items(requests) { request ->
+                        RequestCard(
+                            request = request,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // Incoming Requests Section Title
-            item {
-                Text(
-                    text = "Incoming Requests",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-
-            // Request Cards
-            items(requests) { request ->
-                RequestCard(
-                    request = request,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // Add Artwork Button
-            item {
-                Button(
-                    onClick = onAddArtworkClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = "+ Add Artwork",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+                // Add Artwork Button
+                item {
+                    Button(
+                        onClick = onAddArtworkClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .padding(horizontal = 16.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(
+                            text = "+ Add Artwork",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
         }
     }

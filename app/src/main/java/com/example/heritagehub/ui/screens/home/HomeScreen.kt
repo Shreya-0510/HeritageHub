@@ -1,5 +1,7 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.home
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,11 +16,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -27,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,11 +40,13 @@ import com.example.heritagehub.model.Artwork
 import com.example.heritagehub.ui.components.ArtworkCard
 import com.example.heritagehub.viewmodel.AuthViewModel
 import com.example.heritagehub.viewmodel.HomeViewModel
+import com.example.heritagehub.ui.components.ShimmerArtworkList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: AuthViewModel,
+    context: Context? = null,
     onLogout: () -> Unit,
     onNavigateToDetail: (String) -> Unit = {},
     onNavigateToProfile: (String) -> Unit = {}
@@ -91,11 +95,13 @@ fun HomeScreen(
                     onClick = {}
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout") },
+                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = "Logout") },
                     label = { Text("Logout") },
                     selected = false,
                     onClick = {
-                        viewModel.logout()
+                        if (context != null) {
+                            viewModel.logout(context)
+                        }
                         onLogout()
                     }
                 )
@@ -103,6 +109,18 @@ fun HomeScreen(
         }
     ) { innerPadding ->
         if (isLoading) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                item {
+                    ShimmerArtworkList(count = 8)
+                }
+            }
+        } else if (artworks.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -110,9 +128,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Loading artworks...")
+                Text("No artworks available")
             }
         } else {
             LazyColumn(

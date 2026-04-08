@@ -12,7 +12,12 @@
           "package_name": "com.example.heritagehub"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "192024124632-ihd8ntgfu3i8ai6g3hkmpg9286v0dlbn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC5pHpAsng5J6vdDKVs6S21yeikJ771TPc"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "192024124632-ihd8ntgfu3i8ai6g3hkmpg9286v0dlbn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -1,5 +1,7 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.navigation
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -10,8 +12,13 @@ import androidx.navigation.compose.rememberNavController
 import com.example.heritagehub.ui.screens.artisan.AddArtworkScreen
 import com.example.heritagehub.ui.screens.artisan.ArtisanDashboardScreen
 import com.example.heritagehub.ui.screens.artisan.ArtisanProfileScreen
+import com.example.heritagehub.ui.screens.auth.ForgotPasswordScreen
 import com.example.heritagehub.ui.screens.auth.LoginScreen
-import com.example.heritagehub.ui.screens.auth.SignupScreen
+import com.example.heritagehub.ui.screens.auth.SignupInitialScreen
+import com.example.heritagehub.ui.screens.auth.SignupMethodSelectionScreen
+import com.example.heritagehub.ui.screens.auth.SignupEmailPasswordScreen
+import com.example.heritagehub.ui.screens.auth.SignupMobileOtpScreen
+import com.example.heritagehub.ui.screens.auth.SignupGoogleScreen
 import com.example.heritagehub.ui.screens.customization.CustomizationRequestScreen
 import com.example.heritagehub.ui.screens.detail.ArtworkDetailScreen
 import com.example.heritagehub.ui.screens.home.HomeScreen
@@ -20,7 +27,20 @@ import com.example.heritagehub.viewmodel.AuthViewModel
 
 sealed class Route(val path: String) {
     data object Login : Route("login")
-    data object Signup : Route("signup")
+    data object SignupInitial : Route("signup_initial")
+    data object SignupMethodSelection : Route("signup_method_selection/{username}/{email}") {
+        fun createRoute(username: String, email: String) = "signup_method_selection/$username/$email"
+    }
+    data object SignupEmailPassword : Route("signup_email_password/{username}/{email}/{role}") {
+        fun createRoute(username: String, email: String, role: String = "user") = "signup_email_password/$username/$email/$role"
+    }
+    data object SignupMobileOtp : Route("signup_mobile_otp/{username}/{email}/{role}") {
+        fun createRoute(username: String, email: String, role: String) = "signup_mobile_otp/$username/$email/$role"
+    }
+    data object SignupGoogle : Route("signup_google/{username}/{email}/{role}") {
+        fun createRoute(username: String, email: String, role: String) = "signup_google/$username/$email/$role"
+    }
+    data object ForgotPassword : Route("forgot_password")
     data object Home : Route("home")
     data object ArtisanDashboard : Route("artisan_dashboard")
     data object AddArtwork : Route("add_artwork")
@@ -44,10 +64,13 @@ sealed class Route(val path: String) {
 @Composable
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
-    viewModel: AuthViewModel = viewModel()
+    viewModel: AuthViewModel = viewModel(),
+    context: Context? = null
 ) {
     LaunchedEffect(Unit) {
-        viewModel.checkAuthStatus()
+        if (context != null) {
+            viewModel.checkAuthStatus(context)
+        }
         if (viewModel.isAuthenticated.value) {
             // Route based on user role
             val role = viewModel.userRole.value
@@ -66,14 +89,12 @@ fun AppNavHost(
         navController = navController,
         startDestination = Route.Login.path
     ) {
+        // ==================== LOGIN & SIGNUP ====================
+
         composable(Route.Login.path) {
             LoginScreen(
                 viewModel = viewModel,
-                onNavigateToSignup = {
-                    navController.navigate(Route.Signup.path)
-                },
                 onLoginSuccess = {
-                    // Route based on user role
                     val role = viewModel.userRole.value
                     val destination = if (role == "artisan") {
                         Route.ArtisanDashboard.path
@@ -83,15 +104,21 @@ fun AppNavHost(
                     navController.navigate(destination) {
                         popUpTo(Route.Login.path) { inclusive = true }
                     }
+                },
+                onNavigateToSignup = {
+                    navController.navigate(Route.SignupInitial.path)
+                },
+                onNavigateToForgotPassword = {
+                    navController.navigate(Route.ForgotPassword.path)
                 }
             )
         }
 
-        composable(Route.Signup.path) {
-            SignupScreen(
+        composable(Route.SignupInitial.path) {
+            SignupInitialScreen(
                 viewModel = viewModel,
-                onSignupSuccess = {
-                    // Route based on user role
+                onProceed = { username, email ->
+                    // Role is now set in viewModel during signup
                     val role = viewModel.userRole.value
                     val destination = if (role == "artisan") {
                         Route.ArtisanDashboard.path
@@ -100,6 +127,161 @@ fun AppNavHost(
                     }
                     navController.navigate(destination) {
                         popUpTo(Route.Login.path) { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.navigate(Route.Login.path) {
+                        popUpTo(Route.SignupInitial.path) { inclusive = true }
+                    }
+                },
+                onContinueWithPhone = { username, email, role ->
+                    navController.navigate(Route.SignupMobileOtp.createRoute(username, email, role))
+                },
+                onContinueWithGoogle = { username, email, role ->
+                    navController.navigate(Route.SignupGoogle.createRoute(username, email, role))
+                }
+            )
+        }
+
+        composable(
+            Route.SignupMethodSelection.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("username") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("email") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+
+            SignupMethodSelectionScreen(
+                username = username,
+                email = email,
+                onSelectEmailPassword = {
+                    navController.navigate(Route.SignupEmailPassword.createRoute(username, email, "user"))
+                },
+                onSelectMobileOtp = {
+                    navController.navigate(Route.SignupMobileOtp.createRoute(username, email, "user"))
+                },
+                onSelectGoogle = {
+                    navController.navigate(Route.SignupGoogle.createRoute(username, email, "user"))
+                },
+                onBackToInitial = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            Route.SignupEmailPassword.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("username") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("email") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("role") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            val role = backStackEntry.arguments?.getString("role") ?: "user"
+
+            SignupEmailPasswordScreen(
+                viewModel = viewModel,
+                username = username,
+                email = email,
+                role = role,
+                onSignupSuccess = {
+                    val role = viewModel.userRole.value
+                    val destination = if (role == "artisan") {
+                        Route.ArtisanDashboard.path
+                    } else {
+                        Route.Home.path
+                    }
+                    navController.navigate(destination) {
+                        popUpTo(Route.Login.path) { inclusive = true }
+                    }
+                },
+                onBackToMethodSelection = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            Route.SignupMobileOtp.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("username") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("email") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("role") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            val role = backStackEntry.arguments?.getString("role") ?: "user"
+
+            SignupMobileOtpScreen(
+                viewModel = viewModel,
+                username = username,
+                email = email,
+                role = role,
+                onSignupSuccess = {
+                    val roleFromViewModel = viewModel.userRole.value ?: role
+                    val destination = if (roleFromViewModel == "artisan") {
+                        Route.ArtisanDashboard.path
+                    } else {
+                        Route.Home.path
+                    }
+                    navController.navigate(destination) {
+                        popUpTo(Route.Login.path) { inclusive = true }
+                    }
+                },
+                onBackToMethodSelection = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            Route.SignupGoogle.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("username") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("email") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("role") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            val role = backStackEntry.arguments?.getString("role") ?: "user"
+
+            SignupGoogleScreen(
+                viewModel = viewModel,
+                username = username,
+                email = email,
+                role = role,
+                onSignupSuccess = {
+                    val roleFromViewModel = viewModel.userRole.value ?: role
+                    val destination = if (roleFromViewModel == "artisan") {
+                        Route.ArtisanDashboard.path
+                    } else {
+                        Route.Home.path
+                    }
+                    navController.navigate(destination) {
+                        popUpTo(Route.Login.path) { inclusive = true }
+                    }
+                },
+                onBackToMethodSelection = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Route.ForgotPassword.path) {
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSuccess = {
+                    navController.navigate(Route.Login.path) {
+                        popUpTo(Route.ForgotPassword.path) { inclusive = true }
                     }
                 }
             )
@@ -108,7 +290,11 @@ fun AppNavHost(
         composable(Route.Home.path) {
             HomeScreen(
                 viewModel = viewModel,
+                context = context,
                 onLogout = {
+                    if (context != null) {
+                        viewModel.logout(context)
+                    }
                     navController.navigate(Route.Login.path) {
                         popUpTo(Route.Home.path) { inclusive = true }
                     }
@@ -125,7 +311,11 @@ fun AppNavHost(
         composable(Route.ArtisanDashboard.path) {
             ArtisanDashboardScreen(
                 viewModel = viewModel,
+                context = context,
                 onLogout = {
+                    if (context != null) {
+                        viewModel.logout(context)
+                    }
                     navController.navigate(Route.Login.path) {
                         popUpTo(Route.ArtisanDashboard.path) { inclusive = true }
                     }
@@ -139,6 +329,7 @@ fun AppNavHost(
         composable(Route.AddArtwork.path) {
             AddArtworkScreen(
                 viewModel = viewModel<ArtisanViewModel>(),
+                authViewModel = viewModel<AuthViewModel>(),
                 onBack = {
                     navController.popBackStack()
                 },

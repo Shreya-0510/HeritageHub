@@ -1,3 +1,4 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.artisan
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -21,6 +22,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -28,21 +32,30 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.viewmodel.ArtisanViewModel
+import com.example.heritagehub.viewmodel.AuthViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddArtworkScreen(
     viewModel: ArtisanViewModel,
-    artistName: String = "Current Artisan",
+    authViewModel: AuthViewModel,
     onBack: () -> Unit,
     onArtworkAdded: () -> Unit
 ) {
+    // Get the real username from auth
+    val artistName = authViewModel.userName.value ?: "Artisan"
+
     val title = remember { mutableStateOf("") }
     val description = remember { mutableStateOf("") }
     val price = remember { mutableStateOf("") }
@@ -52,6 +65,12 @@ fun AddArtworkScreen(
     val customizationAvailable = remember { mutableStateOf(false) }
     val error = remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val isSubmitting = remember { mutableStateOf(false) }
+
+    val firestore = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -67,7 +86,7 @@ fun AddArtworkScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                            Icons.Default.ArrowBack,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -78,6 +97,9 @@ fun AddArtworkScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         }
     ) { innerPadding ->
         Column(
@@ -305,20 +327,57 @@ fun AddArtworkScreen(
                                 error.value = "Please enter price"
                             }
                             else -> {
-                                viewModel.addArtwork(
-                                    title = title.value,
-                                    artistName = artistName,
-                                    imageUrl = imageUrl.value,
-                                    description = description.value,
-                                    price = price.value,
-                                    category = category.value,
-                                    customizationAvailable = customizationAvailable.value,
-                                    videoUrl = videoUrl.value.takeIf { it.isNotEmpty() }
-                                )
-                                onArtworkAdded()
+                                isSubmitting.value = true
+                                scope.launch {
+                                    try {
+                                        val userId = auth.currentUser?.uid ?: return@launch
+
+                                        val artwork = mapOf(
+                                            "title" to title.value,
+                                            "artistName" to artistName,
+                                            "artistId" to userId,
+                                            "imageUrl" to imageUrl.value,
+                                            "description" to description.value,
+                                            "price" to price.value,
+                                            "category" to category.value,
+                                            "customizationAvailable" to customizationAvailable.value,
+                                            "videoUrl" to videoUrl.value.takeIf { it.isNotEmpty() },
+                                            "createdAt" to System.currentTimeMillis()
+                                        )
+
+                                        firestore.collection("artworks")
+                                            .add(artwork)
+                                            .await()
+
+                                        snackbarHostState.showSnackbar(
+                                            message = "Artwork added successfully!",
+                                            duration = SnackbarDuration.Short
+                                        )
+
+                                        isSubmitting.value = false
+                                        // Also add to local viewmodel
+                                        viewModel.addArtwork(
+                                            title = title.value,
+                                            artistName = artistName,
+                                            imageUrl = imageUrl.value,
+                                            description = description.value,
+                                            price = price.value,
+                                            category = category.value,
+                                            customizationAvailable = customizationAvailable.value,
+                                            videoUrl = videoUrl.value.takeIf { it.isNotEmpty() }
+                                        )
+
+                                        kotlinx.coroutines.delay(500)
+                                        onArtworkAdded()
+                                    } catch (e: Exception) {
+                                        isSubmitting.value = false
+                                        error.value = "Error: ${e.message ?: "Failed to add artwork"}"
+                                    }
+                                }
                             }
                         }
                     },
+                    enabled = !isSubmitting.value,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
@@ -328,7 +387,7 @@ fun AddArtworkScreen(
                     )
                 ) {
                     Text(
-                        text = "Add Artwork",
+                        text = if (isSubmitting.value) "Adding..." else "Add Artwork",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )

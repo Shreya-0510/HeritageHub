@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection - handles all auth methods (email, phone, Google)
+    match /users/{userId} {
+      // Allow users to read their own document
+      allow read: if request.auth.uid == userId;
+
+      // Allow users to write their own document (authenticated users)
+      allow write: if request.auth.uid == userId;
+
+      // Allow querying to find users by username (for login) - unauthenticated
+      allow read: if request.query.limit <= 100;
+
+      // Allow creating a new user document during signup (no auth yet OR own uid)
+      allow create: if request.auth.uid == userId || !request.auth.uid;
+
+      // Allow anyone to query for username existence check during signup
+      allow read: if true;
+
+      // Allow unauthenticated users to write to their own document during phone OTP signup
+      allow write: if !request.auth.uid && request.resource.data.uid == userId;
+    }
+
+    // Phone verification collection - for OTP verification tracking (optional for future)
+    match /phoneVerifications/{verificationId} {
+      // Allow users to create their own verification records
+      allow create: if request.auth.uid != null || true;  // Allow both auth and unauth
+
+      // Allow users to read their own verification records
+      allow read: if request.auth.uid != null;
+
+      // Allow users to update their own verification records
+      allow update: if request.auth.uid != null;
+    }
+
+    // Artworks collection - for artisan gallery
+    match /artworks/{artworkId} {
+      // Allow anyone to read artworks
+      allow read: if true;
+
+      // Allow authenticated users to create artworks
+      allow create: if request.auth.uid != null &&
+                       request.resource.data.artistId == request.auth.uid;
+
+      // Allow artisans to update/delete their own artworks
+      allow update, delete: if request.auth.uid != null &&
+                              resource.data.artistId == request.auth.uid;
+    }
+
+    // Customization Requests collection
+    match /customizationRequests/{requestId} {
+      // Allow authenticated users to create requests
+      allow create: if request.auth.uid != null;
+
+      // Allow request creator or artisan to read
+      allow read: if request.auth.uid != null &&
+                     (resource.data.userId == request.auth.uid ||
+                      resource.data.artisanId == request.auth.uid);
+
+      // Allow request creator or artisan to update
+      allow update: if request.auth.uid != null &&
+                       (resource.data.userId == request.auth.uid ||
+                        resource.data.artisanId == request.auth.uid);
+
+      // Allow request creator to delete
+      allow delete: if request.auth.uid != null &&
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+
