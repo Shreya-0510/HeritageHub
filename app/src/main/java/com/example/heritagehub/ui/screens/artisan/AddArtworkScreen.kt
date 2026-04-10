@@ -41,9 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.example.heritagehub.viewmodel.ArtisanViewModel
 import com.example.heritagehub.viewmodel.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +51,10 @@ fun AddArtworkScreen(
     onBack: () -> Unit,
     onArtworkAdded: () -> Unit
 ) {
-    // Get the real username from auth
-    val artistName = authViewModel.userName.value ?: "Artisan"
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
+    val fallbackName = firebaseUser?.displayName?.takeIf { it.isNotBlank() }
+        ?: firebaseUser?.email?.substringBefore("@").orEmpty().ifBlank { "Artisan" }
+    val artistName = authViewModel.userName.value?.takeIf { it.isNotBlank() } ?: fallbackName
 
     val title = remember { mutableStateOf("") }
     val description = remember { mutableStateOf("") }
@@ -68,9 +68,6 @@ fun AddArtworkScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val isSubmitting = remember { mutableStateOf(false) }
-
-    val firestore = FirebaseFirestore.getInstance()
-    val auth = FirebaseAuth.getInstance()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -329,49 +326,28 @@ fun AddArtworkScreen(
                             else -> {
                                 isSubmitting.value = true
                                 scope.launch {
-                                    try {
-                                        val userId = auth.currentUser?.uid ?: return@launch
+                                    val result = viewModel.addArtwork(
+                                        title = title.value,
+                                        artistName = artistName,
+                                        imageUrl = imageUrl.value,
+                                        description = description.value,
+                                        price = price.value,
+                                        category = category.value,
+                                        customizationAvailable = customizationAvailable.value,
+                                        videoUrl = videoUrl.value.takeIf { it.isNotEmpty() }
+                                    )
 
-                                        val artwork = mapOf(
-                                            "title" to title.value,
-                                            "artistName" to artistName,
-                                            "artistId" to userId,
-                                            "imageUrl" to imageUrl.value,
-                                            "description" to description.value,
-                                            "price" to price.value,
-                                            "category" to category.value,
-                                            "customizationAvailable" to customizationAvailable.value,
-                                            "videoUrl" to videoUrl.value.takeIf { it.isNotEmpty() },
-                                            "createdAt" to System.currentTimeMillis()
-                                        )
-
-                                        firestore.collection("artworks")
-                                            .add(artwork)
-                                            .await()
-
+                                    if (result.isSuccess) {
                                         snackbarHostState.showSnackbar(
                                             message = "Artwork added successfully!",
                                             duration = SnackbarDuration.Short
                                         )
-
                                         isSubmitting.value = false
-                                        // Also add to local viewmodel
-                                        viewModel.addArtwork(
-                                            title = title.value,
-                                            artistName = artistName,
-                                            imageUrl = imageUrl.value,
-                                            description = description.value,
-                                            price = price.value,
-                                            category = category.value,
-                                            customizationAvailable = customizationAvailable.value,
-                                            videoUrl = videoUrl.value.takeIf { it.isNotEmpty() }
-                                        )
-
-                                        kotlinx.coroutines.delay(500)
                                         onArtworkAdded()
-                                    } catch (e: Exception) {
+                                    } else {
                                         isSubmitting.value = false
-                                        error.value = "Error: ${e.message ?: "Failed to add artwork"}"
+                                        error.value = result.exceptionOrNull()?.message
+                                            ?: "Failed to add artwork"
                                     }
                                 }
                             }

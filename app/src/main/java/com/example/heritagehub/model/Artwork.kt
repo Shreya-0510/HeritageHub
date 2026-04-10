@@ -9,6 +9,7 @@ data class Artwork(
     val price: String = "",
     val category: String = "",
     val customizationAvailable: Boolean = false,
-    val videoUrl: String? = null
+    val videoUrl: String? = null,
+    val artistId: String = ""
 )
 

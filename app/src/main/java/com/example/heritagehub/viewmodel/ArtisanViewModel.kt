@@ -3,12 +3,14 @@ package com.example.heritagehub.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.heritagehub.model.Artwork
+import com.example.heritagehub.model.CustomizationRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 class ArtisanViewModel : ViewModel() {
-    // Local state for artworks (cached)
     val artworks = mutableStateOf<List<Artwork>>(emptyList())
+    val requests = mutableStateOf<List<CustomizationRequest>>(emptyList())
     val isLoading = mutableStateOf(false)
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -16,6 +18,7 @@ class ArtisanViewModel : ViewModel() {
 
     init {
         refreshArtworks()
+        refreshCustomizationRequests()
     }
 
     fun refreshArtworks() {
@@ -39,7 +42,8 @@ class ArtisanViewModel : ViewModel() {
                         price = doc.getString("price") ?: "",
                         category = doc.getString("category") ?: "",
                         customizationAvailable = doc.getBoolean("customizationAvailable") ?: false,
-                        videoUrl = doc.getString("videoUrl")
+                        videoUrl = doc.getString("videoUrl"),
+                        artistId = doc.getString("artistId") ?: ""
                     )
                 }
                 artworks.value = artworkList
@@ -50,7 +54,35 @@ class ArtisanViewModel : ViewModel() {
             }
     }
 
-    fun addArtwork(
+    fun refreshCustomizationRequests() {
+        val currentUserId = auth.currentUser?.uid ?: run {
+            requests.value = emptyList()
+            return
+        }
+
+        firestore.collection("customization_requests")
+            .whereEqualTo("artistId", currentUserId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                requests.value = snapshot.documents.map { doc ->
+                    CustomizationRequest(
+                        id = doc.id,
+                        artistId = doc.getString("artistId").orEmpty(),
+                        artistName = doc.getString("artistName").orEmpty(),
+                        userId = doc.getString("userId").orEmpty(),
+                        description = doc.getString("description").orEmpty(),
+                        budget = doc.getString("budget").orEmpty(),
+                        deadline = doc.getString("deadline").orEmpty(),
+                        status = doc.getString("status") ?: "pending"
+                    )
+                }
+            }
+            .addOnFailureListener {
+                requests.value = emptyList()
+            }
+    }
+
+    suspend fun addArtwork(
         title: String,
         artistName: String,
         imageUrl: String,
@@ -59,12 +91,14 @@ class ArtisanViewModel : ViewModel() {
         category: String,
         customizationAvailable: Boolean,
         videoUrl: String? = null
-    ) {
-        if (title.isEmpty() || artistName.isEmpty() || imageUrl.isEmpty()) {
-            return
+    ): Result<Unit> {
+        if (title.isBlank() || artistName.isBlank() || imageUrl.isBlank()) {
+            return Result.failure(IllegalArgumentException("Missing required artwork fields"))
         }
 
-        val currentUserId = auth.currentUser?.uid ?: return
+        val currentUserId = auth.currentUser?.uid
+            ?: return Result.failure(IllegalStateException("User is not logged in"))
+
         val artwork = mapOf(
             "title" to title,
             "artistName" to artistName,
@@ -78,15 +112,18 @@ class ArtisanViewModel : ViewModel() {
             "createdAt" to System.currentTimeMillis()
         )
 
-        firestore.collection("artworks")
-            .add(artwork)
-            .addOnSuccessListener {
-                refreshArtworks()
-            }
+        return try {
+            firestore.collection("artworks").add(artwork).await()
+            refreshArtworks()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     fun getArtworks(): List<Artwork> {
         return artworks.value
     }
 }
+
 

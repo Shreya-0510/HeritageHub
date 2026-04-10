@@ -21,6 +21,42 @@ service cloud.firestore {
 
       // Allow unauthenticated users to write to their own document during phone OTP signup
       allow write: if !request.auth.uid && request.resource.data.uid == userId;
+
+      // User cart items (one document per artwork id)
+      match /cart/{artworkId} {
+        allow read, delete: if request.auth.uid == userId;
+
+        allow create, update: if request.auth.uid == userId
+                              && request.resource.data.artworkId == artworkId
+                              && request.resource.data.quantity is int
+                              && request.resource.data.quantity >= 1
+                              && request.resource.data.quantity <= 20
+                              && request.resource.data.unitPrice is number;
+      }
+
+      // User orders created from checkout
+      match /orders/{orderId} {
+        allow read: if request.auth.uid == userId;
+
+        allow create: if request.auth.uid == userId
+                      && request.resource.data.itemCount is int
+                      && request.resource.data.itemCount > 0
+                      && request.resource.data.total is number;
+      }
+
+      // Saved delivery address and payment details used during checkout.
+      match /checkout_preferences/{preferenceId} {
+        allow read: if request.auth.uid == userId;
+
+        allow create, update: if request.auth.uid == userId
+                              && request.resource.data.fullName is string
+                              && request.resource.data.phoneNumber is string
+                              && request.resource.data.addressLine1 is string
+                              && request.resource.data.city is string
+                              && request.resource.data.state is string
+                              && request.resource.data.pincode is string
+                              && request.resource.data.paymentMethod is string;
+      }
     }
 
     // Phone verification collection - for OTP verification tracking (optional for future)
@@ -50,23 +86,28 @@ service cloud.firestore {
     }
 
     // Customization Requests collection
-    match /customizationRequests/{requestId} {
+    match /customization_requests/{requestId} {
       // Allow authenticated users to create requests
       allow create: if request.auth.uid != null;
 
       // Allow request creator or artisan to read
       allow read: if request.auth.uid != null &&
                      (resource.data.userId == request.auth.uid ||
-                      resource.data.artisanId == request.auth.uid);
+                      resource.data.artistId == request.auth.uid);
 
       // Allow request creator or artisan to update
       allow update: if request.auth.uid != null &&
                        (resource.data.userId == request.auth.uid ||
-                        resource.data.artisanId == request.auth.uid);
+                        resource.data.artistId == request.auth.uid);
 
       // Allow request creator to delete
       allow delete: if request.auth.uid != null &&
                        resource.data.userId == request.auth.uid;
+    }
+
+    // Backward compatible path if old clients still write camelCase collection names.
+    match /customizationRequests/{requestId} {
+      allow read, create, update, delete: if request.auth.uid != null;
     }
 
     // Default deny all

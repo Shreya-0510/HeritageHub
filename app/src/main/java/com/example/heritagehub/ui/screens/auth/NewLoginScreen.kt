@@ -7,17 +7,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.viewmodel.AuthViewModel
@@ -52,14 +53,17 @@ fun LoginScreen(
     val isLoading = viewModel.isLoading.value
     val context = LocalContext.current
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
                 .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
         ) {
             Text(
                 text = "Welcome Back",
@@ -83,12 +87,12 @@ fun LoginScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(58.dp)
                     .background(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(28.dp)
                     )
-                    .padding(4.dp),
+                    .padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TabButton(
@@ -104,6 +108,8 @@ fun LoginScreen(
                     modifier = Modifier.weight(1f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             if (selectedTab.value == 0) {
                 EmailPasswordLoginTab(
@@ -125,11 +131,19 @@ fun LoginScreen(
                     text = viewModel.error.value ?: "",
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    textAlign = TextAlign.Start
                 )
             }
 
-            TextButton(onClick = onNavigateToSignup, enabled = !isLoading, modifier = Modifier.padding(top = 16.dp)) {
+            Spacer(modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = onNavigateToSignup,
+                enabled = !isLoading,
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
                 Text("Don't have an account? Sign up")
             }
         }
@@ -145,12 +159,13 @@ fun TabButton(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .fillMaxSize()
+            .clip(RoundedCornerShape(24.dp))
             .background(
                 color = if (isSelected)
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.primaryContainer
                 else
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             )
             .clickable { onClick() },
         contentAlignment = Alignment.Center
@@ -160,7 +175,7 @@ fun TabButton(
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (isSelected)
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.onPrimaryContainer
             else
                 MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -187,7 +202,7 @@ fun EmailPasswordLoginTab(
         placeholder = { Text("your@email.com or username") },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(top = 16.dp, bottom = 12.dp),
         enabled = !isLoading,
         singleLine = true
     )
@@ -255,7 +270,12 @@ fun EmailPasswordLoginTab(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .height(52.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
         enabled = !isLoading && emailOrUsername.value.isNotEmpty() && password.value.isNotEmpty()
     ) {
         if (isLoading) {
@@ -304,7 +324,8 @@ fun MobileOtpLoginTab(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
             enabled = !isLoading && phoneNumber.value.isNotEmpty()
         ) {
             if (isLoading) {
@@ -340,7 +361,8 @@ fun MobileOtpLoginTab(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
             enabled = !isLoading && otp.value.length == 6
         ) {
             if (isLoading) {

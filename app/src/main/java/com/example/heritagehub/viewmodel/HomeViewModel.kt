@@ -18,14 +18,16 @@ class HomeViewModel(
     val isLoading: State<Boolean> = _isLoading
 
     init {
-        loadArtworks()
+        refreshArtworks()
     }
 
-    private fun loadArtworks() {
+    fun refreshArtworks() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 _artworks.value = repository.getArtworks()
+            } catch (_: Exception) {
+                _artworks.value = emptyList()
             } finally {
                 _isLoading.value = false
             }

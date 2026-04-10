@@ -36,89 +36,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.heritagehub.model.Artwork
+import com.example.heritagehub.model.CustomizationRequest
 import com.example.heritagehub.ui.components.ArtworkCard
 import com.example.heritagehub.ui.components.ShimmerArtworkList
-import com.example.heritagehub.ui.components.ShimmerRequestList
 import com.example.heritagehub.viewmodel.AuthViewModel
 import com.example.heritagehub.viewmodel.ArtisanViewModel
 
-// ...existing code...
-private fun getDummyArtworks(): List<Artwork> {
-    return listOf(
-        Artwork(
-            id = "1",
-            title = "Moonlight Sonata",
-            artistName = "Artisan",
-            imageUrl = "https://via.placeholder.com/400",
-            description = "A beautiful abstract piece inspired by Chopin's classical masterpiece",
-            price = "$500",
-            category = "Painting",
-            customizationAvailable = true
-        ),
-        Artwork(
-            id = "2",
-            title = "Golden Hour",
-            artistName = "Artisan",
-            imageUrl = "https://via.placeholder.com/400",
-            description = "Capturing the magical moments of sunset",
-            price = "$750",
-            category = "Photography",
-            customizationAvailable = false
-        ),
-        Artwork(
-            id = "3",
-            title = "Serenity",
-            artistName = "Artisan",
-            imageUrl = "https://via.placeholder.com/400",
-            description = "A minimalist representation of inner peace",
-            price = "$400",
-            category = "Digital Art",
-            customizationAvailable = true
-        ),
-        Artwork(
-            id = "4",
-            title = "Echoes",
-            artistName = "Artisan",
-            imageUrl = "https://via.placeholder.com/400",
-            description = "Modern sculpture exploring the concept of sound waves",
-            price = "$1200",
-            category = "Sculpture",
-            customizationAvailable = false
-        )
-    )
-}
-
-private fun getDummyRequests(): List<CustomizationRequestItem> {
-    return listOf(
-        CustomizationRequestItem(
-            id = "r1",
-            clientName = "John Doe",
-            description = "Custom portrait painting",
-            budget = "$500",
-            status = "Pending"
-        ),
-        CustomizationRequestItem(
-            id = "r2",
-            clientName = "Jane Smith",
-            description = "Abstract artwork for office",
-            budget = "$1000",
-            status = "In Progress"
-        ),
-        CustomizationRequestItem(
-            id = "r3",
-            clientName = "Mike Johnson",
-            description = "Sculpture commission",
-            budget = "$2000",
-            status = "Completed"
-        )
-    )
-}
-
 data class CustomizationRequestItem(
     val id: String,
-    val clientName: String,
     val description: String,
     val budget: String,
+    val deadline: String,
     val status: String
 )
 
@@ -132,12 +60,12 @@ fun ArtisanDashboardScreen(
 ) {
     val artisanViewModel: ArtisanViewModel = viewModel()
     val artworks = artisanViewModel.artworks.value
+    val incomingRequests = artisanViewModel.requests.value
     val isLoading = artisanViewModel.isLoading.value
-    val requests = getDummyRequests()
 
-    // Refresh artworks when screen is displayed (e.g., when returning from AddArtworkScreen)
     LaunchedEffect(Unit) {
         artisanViewModel.refreshArtworks()
+        artisanViewModel.refreshCustomizationRequests()
     }
 
     Scaffold(
@@ -279,7 +207,7 @@ fun ArtisanDashboardScreen(
                 }
 
                 // Request Cards
-                if (requests.isEmpty()) {
+                if (incomingRequests.isEmpty()) {
                     item {
                         Text(
                             text = "No requests yet",
@@ -289,9 +217,15 @@ fun ArtisanDashboardScreen(
                         )
                     }
                 } else {
-                    items(requests) { request ->
+                    items(incomingRequests) { request ->
                         RequestCard(
-                            request = request,
+                            request = CustomizationRequestItem(
+                                id = request.id,
+                                description = request.description,
+                                budget = request.budget,
+                                deadline = request.deadline,
+                                status = request.status
+                            ),
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -353,7 +287,7 @@ private fun RequestCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = request.clientName,
+                    text = "Request #${request.id.takeLast(6)}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
@@ -362,10 +296,10 @@ private fun RequestCard(
                     text = request.status,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = when (request.status) {
-                        "Pending" -> MaterialTheme.colorScheme.error
-                        "In Progress" -> MaterialTheme.colorScheme.tertiary
-                        "Completed" -> MaterialTheme.colorScheme.primary
+                    color = when (request.status.lowercase()) {
+                        "pending" -> MaterialTheme.colorScheme.error
+                        "in_progress", "in progress" -> MaterialTheme.colorScheme.tertiary
+                        "completed" -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
@@ -383,12 +317,19 @@ private fun RequestCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Budget: ${request.budget}",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Budget: ${request.budget}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Deadline: ${request.deadline}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -39,11 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import com.example.heritagehub.model.CustomizationRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +61,6 @@ fun CustomizationRequestScreen(
     val budget = remember { mutableStateOf("") }
     val deadline = remember { mutableStateOf("") }
     val isSubmitting = remember { mutableStateOf(false) }
-    val submissionSuccess = remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -129,8 +127,19 @@ fun CustomizationRequestScreen(
                             scope.launch {
                                 try {
                                     val userId = auth.currentUser?.uid ?: return@launch
+                                    val artistId = resolveArtistId(firestore, artistName)
+
+                                    if (artistId.isBlank()) {
+                                        isSubmitting.value = false
+                                        snackbarHostState.showSnackbar(
+                                            message = "Could not find artist account for $artistName",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        return@launch
+                                    }
 
                                     val request = mapOf(
+                                        "artistId" to artistId,
                                         "artistName" to artistName,
                                         "description" to description.value,
                                         "budget" to budget.value,
@@ -148,7 +157,6 @@ fun CustomizationRequestScreen(
                                         message = "Customization request submitted successfully!",
                                         duration = SnackbarDuration.Short
                                     )
-                                    submissionSuccess.value = true
                                     isSubmitting.value = false
 
                                     kotlinx.coroutines.delay(500)
@@ -293,5 +301,29 @@ private fun SubmitButton(isLoading: Boolean, onClick: () -> Unit) {
 
 private fun validateForm(description: String, budget: String, deadline: String): Boolean {
     return description.isNotBlank() && budget.isNotBlank() && deadline.isNotBlank()
+}
+
+private suspend fun resolveArtistId(firestore: FirebaseFirestore, artistName: String): String {
+    val userDoc = firestore.collection("users")
+        .whereEqualTo("username", artistName)
+        .limit(1)
+        .get()
+        .await()
+        .documents
+        .firstOrNull()
+
+    if (userDoc != null) {
+        return userDoc.id
+    }
+
+    val artworkDoc = firestore.collection("artworks")
+        .whereEqualTo("artistName", artistName)
+        .limit(1)
+        .get()
+        .await()
+        .documents
+        .firstOrNull()
+
+    return artworkDoc?.getString("artistId").orEmpty()
 }
 

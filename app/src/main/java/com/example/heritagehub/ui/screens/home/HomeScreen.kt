@@ -15,12 +15,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -30,6 +31,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -49,11 +55,18 @@ fun HomeScreen(
     context: Context? = null,
     onLogout: () -> Unit,
     onNavigateToDetail: (String) -> Unit = {},
-    onNavigateToProfile: (String) -> Unit = {}
+    onNavigateToProfile: (String) -> Unit = {},
+    onNavigateToCart: () -> Unit = {},
+    onNavigateToOrders: () -> Unit = {}
 ) {
     val homeViewModel: HomeViewModel = viewModel()
     val artworks = homeViewModel.artworks.value
     val isLoading = homeViewModel.isLoading.value
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        homeViewModel.refreshArtworks()
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -65,6 +78,21 @@ fun HomeScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            if (context != null) {
+                                viewModel.logout(context)
+                            }
+                            onLogout()
+                        }
+                    ) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Logout")
+                    }
+                    IconButton(onClick = onNavigateToCart) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Cart")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -79,36 +107,39 @@ fun HomeScreen(
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                     label = { Text("Home") },
-                    selected = true,
-                    onClick = {}
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Search, contentDescription = "Explore") },
-                    label = { Text("Explore") },
-                    selected = false,
-                    onClick = {}
+                    selected = selectedTabIndex == 0,
+                    onClick = { selectedTabIndex = 0 }
                 )
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Person, contentDescription = "Artisans") },
                     label = { Text("Artisans") },
-                    selected = false,
-                    onClick = {}
+                    selected = selectedTabIndex == 1,
+                    onClick = { selectedTabIndex = 1 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = "Logout") },
-                    label = { Text("Logout") },
+                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Cart") },
+                    label = { Text("Cart") },
                     selected = false,
-                    onClick = {
-                        if (context != null) {
-                            viewModel.logout(context)
-                        }
-                        onLogout()
-                    }
+                    onClick = onNavigateToCart
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.ListAlt, contentDescription = "Orders") },
+                    label = { Text("Orders") },
+                    selected = false,
+                    onClick = onNavigateToOrders
                 )
             }
         }
     ) { innerPadding ->
-        if (isLoading) {
+        if (selectedTabIndex == 1) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                ArtisansScreen(onOpenProfile = onNavigateToProfile)
+            }
+        } else if (isLoading) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -116,9 +147,7 @@ fun HomeScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                item {
-                    ShimmerArtworkList(count = 8)
-                }
+                item { ShimmerArtworkList(count = 8) }
             }
         } else if (artworks.isEmpty()) {
             Column(
@@ -139,10 +168,10 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 item {
-                    FeaturedSection(artworks.take(5), onNavigateToDetail, onNavigateToProfile)
+                    FeaturedSection(artworks.take(5), onNavigateToDetail)
                 }
                 item {
-                    ExploreSection(artworks, onNavigateToDetail, onNavigateToProfile)
+                    ExploreSection(artworks, onNavigateToDetail)
                 }
             }
         }
@@ -152,8 +181,7 @@ fun HomeScreen(
 @Composable
 private fun FeaturedSection(
     artworks: List<Artwork>,
-    onNavigateToDetail: (String) -> Unit = {},
-    onNavigateToProfile: (String) -> Unit = {}
+    onNavigateToDetail: (String) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -181,8 +209,7 @@ private fun FeaturedSection(
 @Composable
 private fun ExploreSection(
     artworks: List<Artwork>,
-    onNavigateToDetail: (String) -> Unit = {},
-    onNavigateToProfile: (String) -> Unit = {}
+    onNavigateToDetail: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),

@@ -2,6 +2,7 @@
 package com.example.heritagehub.ui.navigation
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -22,6 +23,10 @@ import com.example.heritagehub.ui.screens.auth.SignupGoogleScreen
 import com.example.heritagehub.ui.screens.customization.CustomizationRequestScreen
 import com.example.heritagehub.ui.screens.detail.ArtworkDetailScreen
 import com.example.heritagehub.ui.screens.home.HomeScreen
+import com.example.heritagehub.ui.screens.cart.CartScreen
+import com.example.heritagehub.ui.screens.cart.CheckoutScreen
+import com.example.heritagehub.ui.screens.cart.PaymentScreen
+import com.example.heritagehub.ui.screens.orders.OrdersScreen
 import com.example.heritagehub.viewmodel.ArtisanViewModel
 import com.example.heritagehub.viewmodel.AuthViewModel
 
@@ -42,6 +47,10 @@ sealed class Route(val path: String) {
     }
     data object ForgotPassword : Route("forgot_password")
     data object Home : Route("home")
+    data object Cart : Route("cart")
+    data object Checkout : Route("checkout")
+    data object Payment : Route("payment")
+    data object Orders : Route("orders")
     data object ArtisanDashboard : Route("artisan_dashboard")
     data object AddArtwork : Route("add_artwork")
     data class ArtworkDetail(val artworkId: String) : Route("artwork_detail/$artworkId") {
@@ -303,7 +312,66 @@ fun AppNavHost(
                     navController.navigate("artwork_detail/$artworkId")
                 },
                 onNavigateToProfile = { artistName ->
-                    navController.navigate("artisan_profile/$artistName")
+                    navController.navigate("artisan_profile/${Uri.encode(artistName)}")
+                },
+                onNavigateToCart = {
+                    navController.navigate(Route.Cart.path)
+                },
+                onNavigateToOrders = {
+                    navController.navigate(Route.Orders.path)
+                }
+            )
+        }
+
+        composable(Route.Cart.path) {
+            CartScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onCheckout = {
+                    navController.navigate(Route.Checkout.path)
+                },
+                onContinueShopping = {
+                    navController.navigate(Route.Home.path) {
+                        popUpTo(Route.Home.path) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(Route.Checkout.path) {
+            CheckoutScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToPayment = {
+                    navController.navigate(Route.Payment.path)
+                },
+                onOrderPlaced = {
+                    navController.navigate(Route.Orders.path) {
+                        popUpTo(Route.Home.path)
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(Route.Payment.path) {
+            PaymentScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onSaved = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Route.Orders.path) {
+            OrdersScreen(
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -334,7 +402,10 @@ fun AppNavHost(
                     navController.popBackStack()
                 },
                 onArtworkAdded = {
-                    navController.popBackStack()
+                    navController.navigate(Route.ArtisanDashboard.path) {
+                        popUpTo(Route.AddArtwork.path) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -347,29 +418,32 @@ fun AppNavHost(
                     navController.popBackStack()
                 },
                 onNavigateToProfile = { artistName ->
-                    navController.navigate("artisan_profile/$artistName")
+                    navController.navigate("artisan_profile/${Uri.encode(artistName)}")
                 },
                 onNavigateToCustomization = { artistName ->
-                    navController.navigate("customization_request/$artistName")
+                    navController.navigate("customization_request/${Uri.encode(artistName)}")
+                },
+                onNavigateToCart = {
+                    navController.navigate(Route.Cart.path)
                 }
             )
         }
 
         composable(Route.ArtisanProfile.routeTemplate) { backStackEntry ->
-            val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
+            val artistName = Uri.decode(backStackEntry.arguments?.getString("artistName") ?: "")
             ArtisanProfileScreen(
                 artistName = artistName,
                 onBack = {
                     navController.popBackStack()
                 },
                 onNavigateToCustomization = { artistName ->
-                    navController.navigate("customization_request/$artistName")
+                    navController.navigate("customization_request/${Uri.encode(artistName)}")
                 }
             )
         }
 
         composable(Route.CustomizationRequest.routeTemplate) { backStackEntry ->
-            val artistName = backStackEntry.arguments?.getString("artistName") ?: ""
+            val artistName = Uri.decode(backStackEntry.arguments?.getString("artistName") ?: "")
             CustomizationRequestScreen(
                 artistName = artistName,
                 onBack = {
