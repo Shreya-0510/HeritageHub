@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.model.Artwork
+import coil.compose.AsyncImage
 
 @Composable
 fun ArtworkCard(
@@ -53,12 +54,18 @@ fun ArtworkCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                // TODO: Replace with AsyncImage from Coil when dependency is added
-                // For now, showing placeholder
-                Text(
-                    text = "Image: ${artwork.title}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (artwork.primaryImageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = artwork.primaryImageUrl,
+                        contentDescription = artwork.title,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = "No Image",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Column(
@@ -133,6 +140,14 @@ fun ArtworkCard(
                             }
                         }
                     }
+                }
+
+                if (artwork.allVideoUrls.isNotEmpty() || artwork.allImageUrls.size > 1) {
+                    Text(
+                        text = "${artwork.allImageUrls.size} photos - ${artwork.allVideoUrls.size} videos",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

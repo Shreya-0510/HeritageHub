@@ -1,14 +1,18 @@
 @file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.detail
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
@@ -21,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.heritagehub.viewmodel.CartViewModel
 import com.example.heritagehub.viewmodel.HomeViewModel
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +50,8 @@ fun ArtworkDetailScreen(
     }
 
     val artwork = artworks.find { it.id == artworkId }
+    val imageUrls = artwork?.allImageUrls.orEmpty()
+    val videoUrls = artwork?.allVideoUrls.orEmpty()
 
     if (artwork == null) {
         Box(
@@ -79,9 +86,11 @@ fun ArtworkDetailScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
 
-            item { ImageCarousel() }
+            item { ImageCarousel(imageUrls = imageUrls, title = artwork.title) }
 
-            item { PageIndicator(currentPage = 0, totalPages = 3) }
+            if (imageUrls.size > 1) {
+                item { PageIndicator(currentPage = 0, totalPages = imageUrls.size) }
+            }
 
             item {
                 Text(
@@ -157,6 +166,15 @@ fun ArtworkDetailScreen(
                 }
             }
 
+            if (videoUrls.isNotEmpty()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Videos", fontWeight = FontWeight.SemiBold)
+                        VideoList(videoUrls = videoUrls)
+                    }
+                }
+            }
+
             item {
                 Column {
                     Text("About the Artist", fontWeight = FontWeight.SemiBold)
@@ -197,18 +215,53 @@ fun ArtworkDetailScreen(
 }
 
 @Composable
-private fun ImageCarousel() {
+private fun ImageCarousel(imageUrls: List<String>, title: String) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(3) {
-            Box(
-                modifier = Modifier
-                    .height(300.dp)
-                    .width(250.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+        if (imageUrls.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .height(300.dp)
+                        .width(250.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No image")
+                }
+            }
+        } else {
+            items(imageUrls) { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .height(300.dp)
+                        .width(250.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoList(videoUrls: List<String>) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(videoUrls) { url ->
+            OutlinedButton(
+                onClick = {
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
+                    }
+                }
             ) {
-                Text("Image")
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play video")
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Play")
             }
         }
     }

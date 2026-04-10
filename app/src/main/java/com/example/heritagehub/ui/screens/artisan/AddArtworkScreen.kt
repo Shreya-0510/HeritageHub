@@ -1,6 +1,9 @@
 @file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.artisan
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -30,9 +35,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +58,9 @@ fun AddArtworkScreen(
     onBack: () -> Unit,
     onArtworkAdded: () -> Unit
 ) {
+    val context = LocalContext.current
+    val maxImages = 8
+    val maxVideos = 3
     val firebaseUser = FirebaseAuth.getInstance().currentUser
     val fallbackName = firebaseUser?.displayName?.takeIf { it.isNotBlank() }
         ?: firebaseUser?.email?.substringBefore("@").orEmpty().ifBlank { "Artisan" }
@@ -60,14 +70,37 @@ fun AddArtworkScreen(
     val description = remember { mutableStateOf("") }
     val price = remember { mutableStateOf("") }
     val category = remember { mutableStateOf("") }
-    val imageUrl = remember { mutableStateOf("") }
-    val videoUrl = remember { mutableStateOf("") }
+    val selectedImageUris = remember { mutableStateListOf<Uri>() }
+    val selectedVideoUris = remember { mutableStateListOf<Uri>() }
     val customizationAvailable = remember { mutableStateOf(false) }
     val error = remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val isSubmitting = remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            val availableSlots = maxImages - selectedImageUris.size
+            if (availableSlots > 0) {
+                selectedImageUris.addAll(uris.distinct().take(availableSlots))
+                error.value = null
+            }
+        }
+    }
+
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            val availableSlots = maxVideos - selectedVideoUris.size
+            if (availableSlots > 0) {
+                selectedVideoUris.addAll(uris.distinct().take(availableSlots))
+            }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -176,31 +209,86 @@ fun AddArtworkScreen(
             Spacer(modifier = Modifier.height(8.dp))
             SectionHeader(title = "Media")
 
-            // Image URL Field
-            OutlinedTextField(
-                value = imageUrl.value,
-                onValueChange = {
-                    imageUrl.value = it
-                    error.value = null
-                },
-                label = { Text("Image URL *") },
-                placeholder = { Text("https://example.com/image.jpg") },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                singleLine = true,
-                isError = error.value != null && imageUrl.value.isEmpty()
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text("Add Images")
+                }
+
+                Button(
+                    onClick = { videoPickerLauncher.launch("video/*") },
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text("Add Videos")
+                }
+            }
+
+            Text(
+                text = "Selected: ${selectedImageUris.size}/$maxImages images, ${selectedVideoUris.size}/$maxVideos videos",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Video URL Field (Optional)
-            OutlinedTextField(
-                value = videoUrl.value,
-                onValueChange = { videoUrl.value = it },
-                label = { Text("Video URL (Optional)") },
-                placeholder = { Text("https://example.com/video.mp4") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                singleLine = true
-            )
+            if (selectedImageUris.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Selected Images",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                    selectedImageUris.forEachIndexed { index, uri ->
+                        AssistChip(
+                            onClick = { },
+                            label = {
+                                Text(
+                                    text = "Image ${index + 1}",
+                                    maxLines = 1
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { selectedImageUris.remove(uri) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove image")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (selectedVideoUris.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Selected Videos",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                    selectedVideoUris.forEachIndexed { index, uri ->
+                        AssistChip(
+                            onClick = { },
+                            label = {
+                                Text(
+                                    text = "Video ${index + 1}",
+                                    maxLines = 1
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { selectedVideoUris.remove(uri) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove video")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
 
             // ========== PRICING & OPTIONS SECTION ==========
             Spacer(modifier = Modifier.height(8.dp))
@@ -317,8 +405,8 @@ fun AddArtworkScreen(
                             category.value.isEmpty() -> {
                                 error.value = "Please select a category"
                             }
-                            imageUrl.value.isEmpty() -> {
-                                error.value = "Please enter image URL"
+                            selectedImageUris.isEmpty() -> {
+                                error.value = "Please add at least one image"
                             }
                             price.value.isEmpty() -> {
                                 error.value = "Please enter price"
@@ -327,14 +415,15 @@ fun AddArtworkScreen(
                                 isSubmitting.value = true
                                 scope.launch {
                                     val result = viewModel.addArtwork(
+                                        context = context,
                                         title = title.value,
                                         artistName = artistName,
-                                        imageUrl = imageUrl.value,
+                                        imageUris = selectedImageUris.toList(),
                                         description = description.value,
                                         price = price.value,
                                         category = category.value,
                                         customizationAvailable = customizationAvailable.value,
-                                        videoUrl = videoUrl.value.takeIf { it.isNotEmpty() }
+                                        videoUris = selectedVideoUris.toList()
                                     )
 
                                     if (result.isSuccess) {
