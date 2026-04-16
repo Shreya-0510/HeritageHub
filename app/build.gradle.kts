@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)

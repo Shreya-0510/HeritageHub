@@ -1,8 +1,8 @@
 @file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.detail
 
-import android.content.Intent
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,10 +20,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.example.heritagehub.viewmodel.CartViewModel
 import com.example.heritagehub.viewmodel.HomeViewModel
 import coil.compose.AsyncImage
@@ -247,24 +257,151 @@ private fun ImageCarousel(imageUrls: List<String>, title: String) {
 
 @Composable
 private fun VideoList(videoUrls: List<String>) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var selectedVideoUrl by remember { mutableStateOf<String?>(null) }
 
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(videoUrls) { url ->
-            OutlinedButton(
-                onClick = {
-                    runCatching {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        context.startActivity(intent)
-                    }
-                }
+            VideoPreviewCard(
+                label = "Video",
+                onClick = { selectedVideoUrl = url }
+            )
+        }
+    }
+
+    selectedVideoUrl?.let { url ->
+        FullscreenVideoDialog(
+            videoUrl = url,
+            onDismiss = { selectedVideoUrl = null }
+        )
+    }
+}
+
+@Composable
+private fun VideoPreviewCard(
+    label: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(180.dp)
+            .height(130.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Play video")
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Play")
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Text("$label - Tap to play", style = MaterialTheme.typography.bodySmall)
             }
         }
     }
+}
+
+@Composable
+private fun FullscreenVideoDialog(
+    videoUrl: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var playbackError by remember(videoUrl) { mutableStateOf<String?>(null) }
+
+    val player = remember(videoUrl) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(buildMediaItem(videoUrl))
+            playWhenReady = false
+            repeatMode = Player.REPEAT_MODE_OFF
+            prepare()
+        }
+    }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = error.message ?: "Unsupported video format on this device"
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.Black
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(
+                    factory = { viewContext ->
+                        PlayerView(viewContext).apply {
+                            this.player = player
+                            useController = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
+
+                if (playbackError != null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "Unsupported on this device. Try MP4/WebM/MKV.",
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun buildMediaItem(videoUrl: String): MediaItem {
+    val uri = Uri.parse(videoUrl)
+    val extFromUrl = MimeTypeMap.getFileExtensionFromUrl(videoUrl).lowercase()
+    val extFromPath = uri.path?.substringAfterLast('.', "")?.lowercase().orEmpty()
+    val ext = if (extFromUrl.isNotBlank()) extFromUrl else extFromPath
+
+    val mimeType = when (ext) {
+        "mp4", "m4v" -> "video/mp4"
+        "webm" -> "video/webm"
+        "mkv" -> "video/x-matroska"
+        "3gp" -> "video/3gpp"
+        "mov" -> "video/quicktime"
+        "avi" -> "video/x-msvideo"
+        "ts" -> "video/mp2t"
+        "m3u8" -> "application/x-mpegURL"
+        "mpd" -> "application/dash+xml"
+        else -> "video/*"
+    }
+
+    return MediaItem.Builder()
+        .setUri(uri)
+        .setMimeType(mimeType)
+        .build()
 }
 
 @Composable

@@ -181,7 +181,6 @@ fun ArtisanDashboardScreen(
                                     onClick = { /* Handle artwork click */ },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(200.dp)
                                 )
                             }
                             // Add spacer if odd number of items

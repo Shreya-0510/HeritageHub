@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -83,7 +83,12 @@ fun ArtisansScreen(
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(artisans, key = { it.artistName }) { artisan ->
+                    itemsIndexed(
+                        items = artisans,
+                        key = { index, artisan ->
+                            "${artisan.artistId}-${artisan.artistName}-$index"
+                        }
+                    ) { _, artisan ->
                         ArtisanCard(artisan = artisan, onOpenProfile = onOpenProfile)
                     }
                 }
@@ -127,4 +132,6 @@ private fun ArtisanCard(
         }
     }
 }
+
+
 
