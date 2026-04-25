@@ -1,19 +1,29 @@
 package com.example.heritagehub.viewmodel
 
+import android.Manifest
+import android.app.Application
+import android.content.Context
+import android.location.Location
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.core.content.ContextCompat
 import com.example.heritagehub.data.CartRepository
 import com.example.heritagehub.model.Artwork
 import com.example.heritagehub.model.CartItem
 import com.example.heritagehub.model.CartSummary
 import com.example.heritagehub.model.CheckoutPreferences
 import com.example.heritagehub.model.Order
+import com.example.heritagehub.util.LocationUtils
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 
 class CartViewModel(
-    private val repository: CartRepository = CartRepository()
+    private val repository: CartRepository = CartRepository(),
+    private val appContext: Context? = null
 ) : ViewModel() {
 
     private val _items = mutableStateOf<List<CartItem>>(emptyList())
@@ -39,6 +49,11 @@ class CartViewModel(
 
     private val _isLoadingOrders = mutableStateOf(false)
     val isLoadingOrders: State<Boolean> = _isLoadingOrders
+
+    private val _isFetchingLocation = mutableStateOf(false)
+    val isFetchingLocation: State<Boolean> = _isFetchingLocation
+    private val _locationError = mutableStateOf<String?>(null)
+    val locationError: State<String?> = _locationError
 
     init {
         refreshCart()
@@ -184,7 +199,36 @@ class CartViewModel(
             }
         }
     }
+
+    suspend fun fetchAndSetCurrentAddress(context: Context) {
+        _isFetchingLocation.value = true
+        _locationError.value = null
+        try {
+            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            val location: Location? = fusedLocationClient.lastLocation.await()
+            if (location != null) {
+                val geocoded = LocationUtils.reverseGeocode(context, location)
+                if (geocoded != null) {
+                    val currentPrefs = _checkoutPreferences.value.copy(
+                        addressLine1 = geocoded.addressLine1,
+                        addressLine2 = geocoded.addressLine2,
+                        city = geocoded.city,
+                        state = geocoded.state,
+                        pincode = geocoded.pincode
+                    )
+                    saveCheckoutPreferences(currentPrefs)
+                } else {
+                    _locationError.value = "Unable to fetch address from location."
+                }
+            } else {
+                _locationError.value = "Unable to fetch location."
+            }
+        } catch (e: SecurityException) {
+            _locationError.value = "Location permission denied."
+        } catch (e: Exception) {
+            _locationError.value = "Failed to fetch location."
+        } finally {
+            _isFetchingLocation.value = false
+        }
+    }
 }
-
-
-

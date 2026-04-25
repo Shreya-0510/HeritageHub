@@ -1,5 +1,6 @@
 package com.example.heritagehub.ui.screens.cart
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,13 +32,17 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.heritagehub.util.PriceUtils
+import com.example.heritagehub.util.rememberLocationPermissionState
 import com.example.heritagehub.viewmodel.CartViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +58,12 @@ fun CheckoutScreen(
     val preferences = cartViewModel.checkoutPreferences.value
     val message = cartViewModel.message.value
     val snackbarHostState = remember { SnackbarHostState() }
+    val isFetchingLocation = cartViewModel.isFetchingLocation.value
+    val locationError = cartViewModel.locationError.value
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val (locationPermissionGranted, requestLocationPermission) = rememberLocationPermissionState()
 
     LaunchedEffect(Unit) {
         cartViewModel.refreshCart()
@@ -110,8 +121,32 @@ fun CheckoutScreen(
                     } else {
                         Text("No delivery address added yet")
                     }
-                    OutlinedButton(onClick = onNavigateToPayment) {
-                        Text(if (preferences.isValid()) "Change Address / Payment" else "Add Address / Payment")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = onNavigateToPayment) {
+                            Text(if (preferences.isValid()) "Change Address / Payment" else "Add Address / Payment")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (locationPermissionGranted) {
+                                    coroutineScope.launch {
+                                        cartViewModel.fetchAndSetCurrentAddress(context)
+                                    }
+                                } else {
+                                    requestLocationPermission()
+                                }
+                            },
+                            enabled = !isFetchingLocation
+                        ) {
+                            if (isFetchingLocation) {
+                                CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text("Use Current Location")
+                        }
+                    }
+                    if (locationError != null) {
+                        Text(locationError, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -184,6 +219,3 @@ private fun CheckoutPriceLine(label: String, value: String, bold: Boolean = fals
         Text(value, fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium)
     }
 }
-
-
-
