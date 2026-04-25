@@ -56,7 +56,8 @@ fun ArtisanDashboardScreen(
     viewModel: AuthViewModel,
     context: Context? = null,
     onLogout: () -> Unit,
-    onAddArtworkClick: () -> Unit = {}
+    onAddArtworkClick: () -> Unit = {},
+    onArtworkClick: (Artwork) -> Unit // <-- Add this parameter
 ) {
     val artisanViewModel: ArtisanViewModel = viewModel()
     val artworks = artisanViewModel.artworks.value
@@ -178,9 +179,8 @@ fun ArtisanDashboardScreen(
                             rowArtworks.forEach { artwork ->
                                 ArtworkCard(
                                     artwork = artwork,
-                                    onClick = { /* Handle artwork click */ },
-                                    modifier = Modifier
-                                        .weight(1f)
+                                    onClick = { onArtworkClick(artwork) }, // <-- Add this
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                             // Add spacer if odd number of items
@@ -368,12 +368,3 @@ private fun RequestCard(
         }
     }
 }
-
-
-
-
-
-
-
-
-

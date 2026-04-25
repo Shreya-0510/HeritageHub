@@ -53,6 +53,12 @@ sealed class Route(val path: String) {
     data object Orders : Route("orders")
     data object ArtisanDashboard : Route("artisan_dashboard")
     data object AddArtwork : Route("add_artwork")
+    data object ArtisanArtworkDetail : Route("artisan_artwork_detail/{artworkId}") {
+        fun createRoute(artworkId: String) = "artisan_artwork_detail/$artworkId"
+    }
+    data object EditArtwork : Route("edit_artwork/{artworkId}") {
+        fun createRoute(artworkId: String) = "edit_artwork/$artworkId"
+    }
     data class ArtworkDetail(val artworkId: String) : Route("artwork_detail/$artworkId") {
         companion object {
             const val routeTemplate = "artwork_detail/{artworkId}"
@@ -377,6 +383,7 @@ fun AppNavHost(
         }
 
         composable(Route.ArtisanDashboard.path) {
+            val artisanViewModel: ArtisanViewModel = viewModel()
             ArtisanDashboardScreen(
                 viewModel = viewModel,
                 context = context,
@@ -390,6 +397,9 @@ fun AppNavHost(
                 },
                 onAddArtworkClick = {
                     navController.navigate(Route.AddArtwork.path)
+                },
+                onArtworkClick = { artwork ->
+                    navController.navigate(Route.ArtisanArtworkDetail.createRoute(artwork.id))
                 }
             )
         }
@@ -408,6 +418,52 @@ fun AppNavHost(
                     }
                 }
             )
+        }
+
+        // ==================== ARTISAN ARTWORK DETAIL & EDIT ====================
+
+        composable(Route.ArtisanArtworkDetail.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("artworkId") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val artworkId = backStackEntry.arguments?.getString("artworkId") ?: ""
+            val artisanViewModel: ArtisanViewModel = viewModel()
+            val artwork = artisanViewModel.artworks.value.firstOrNull { it.id == artworkId }
+            if (artwork != null) {
+                com.example.heritagehub.ui.screens.artisan.ArtisanArtworkDetailScreen(
+                    artwork = artwork,
+                    onBack = { navController.popBackStack() },
+                    onEdit = {
+                        navController.navigate(Route.EditArtwork.createRoute(artworkId))
+                    }
+                )
+            } else {
+                // Show loading or error UI if artwork not found
+            }
+        }
+
+        composable(Route.EditArtwork.path,
+            arguments = listOf(
+                androidx.navigation.navArgument("artworkId") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val artworkId = backStackEntry.arguments?.getString("artworkId") ?: ""
+            val artisanViewModel: ArtisanViewModel = viewModel()
+            val artwork = artisanViewModel.artworks.value.firstOrNull { it.id == artworkId }
+            if (artwork != null) {
+                com.example.heritagehub.ui.screens.artisan.EditArtworkScreen(
+                    artwork = artwork,
+                    viewModel = artisanViewModel,
+                    onBack = { navController.popBackStack() },
+                    onSave = {
+                        navController.popBackStack(Route.ArtisanArtworkDetail.createRoute(artworkId), inclusive = true)
+                        navController.navigate(Route.ArtisanArtworkDetail.createRoute(artworkId))
+                    }
+                )
+            } else {
+                // Show loading or error UI if artwork not found
+            }
         }
 
         composable(Route.ArtworkDetail.routeTemplate) { backStackEntry ->
@@ -453,4 +509,3 @@ fun AppNavHost(
         }
     }
 }
-

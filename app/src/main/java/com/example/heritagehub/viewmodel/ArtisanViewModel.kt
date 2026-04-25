@@ -220,8 +220,37 @@ class ArtisanViewModel : ViewModel() {
     fun getArtworks(): List<Artwork> {
         return artworks.value
     }
+
+    suspend fun updateArtwork(
+        artwork: Artwork,
+        title: String,
+        description: String,
+        price: String,
+        category: String,
+        customizationAvailable: Boolean,
+        imageUrls: List<String>,
+        videoUrls: List<String>
+    ): Result<Unit> {
+        val currentUserId = auth.currentUser?.uid
+            ?: return Result.failure(IllegalStateException("User is not logged in"))
+        return try {
+            val artworkRef = firestore.collection("artworks").document(artwork.id)
+            val updateMap = mapOf(
+                "title" to title,
+                "description" to description,
+                "price" to price,
+                "category" to category,
+                "customizationAvailable" to customizationAvailable,
+                "imageUrl" to imageUrls.firstOrNull().orEmpty(),
+                "imageUrls" to imageUrls,
+                "videoUrl" to videoUrls.firstOrNull(),
+                "videoUrls" to videoUrls
+            )
+            artworkRef.update(updateMap).await()
+            refreshArtworks()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
-
-
-
-
