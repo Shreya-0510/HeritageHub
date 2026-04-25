@@ -1,12 +1,17 @@
 package com.example.heritagehub.ui.screens.artisan
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.model.Artwork
@@ -38,22 +43,8 @@ fun ArtisanArtworkDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Images gallery
-            if (artwork.allImageUrls.isNotEmpty()) {
-                Text("Images:", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    artwork.allImageUrls.forEach { url ->
-                        AsyncImage(
-                            model = url,
-                            contentDescription = artwork.title,
-                            modifier = Modifier.size(80.dp)
-                        )
-                    }
-                }
-            }
+            // Image carousel (read-only)
+            ImageCarouselReadOnly(imageUrls = artwork.allImageUrls, title = artwork.title)
             OutlinedTextField(
                 value = artwork.title,
                 onValueChange = {},
@@ -111,6 +102,37 @@ fun ArtisanArtworkDetailScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Edit Artwork")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageCarouselReadOnly(imageUrls: List<String>, title: String) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (imageUrls.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .height(220.dp)
+                        .width(180.dp)
+//                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No image")
+                }
+            }
+        } else {
+            items(imageUrls) { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .height(220.dp)
+                        .width(180.dp)
+//                        .clip(RoundedCornerShape(16.dp))
+                )
             }
         }
     }

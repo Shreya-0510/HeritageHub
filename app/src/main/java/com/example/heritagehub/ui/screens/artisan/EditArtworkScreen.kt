@@ -8,15 +8,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.model.Artwork
 import com.example.heritagehub.viewmodel.ArtisanViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,12 +107,39 @@ fun EditArtworkScreen(
                 )
                 Text("Customization Available")
             }
-            Text("Images: ${imageUrls.size}", fontSize = 14.sp)
+            // Image carousel with delete
+            if (imageUrls.isNotEmpty()) {
+                Text("Images:", fontSize = 14.sp)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    itemsIndexed(imageUrls) { index, url ->
+                        Box(modifier = Modifier.height(220.dp).width(180.dp)) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = "Artwork Image",
+                                modifier = Modifier
+                                    .fillMaxSize()
+//                                    .clip(RoundedCornerShape(16.dp))
+                            )
+                            IconButton(
+                                onClick = {
+                                    imageUrls = imageUrls.toMutableList().also { it.removeAt(index) }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(32.dp)
+//                                    .background(Color(0xFFFFC1C1), RoundedCornerShape(8.dp))
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Image", tint = Color(0xFFD32F2F))
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("No images uploaded", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { imagePickerLauncher.launch("image/*") }) { Text("Add Images") }
-                if (imageUrls.isNotEmpty()) {
-                    Button(onClick = { imageUrls = mutableListOf() }) { Text("Clear Images") }
-                }
             }
             Text("Videos: ${videoUrls.size}", fontSize = 14.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

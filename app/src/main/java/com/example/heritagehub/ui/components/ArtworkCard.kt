@@ -143,14 +143,6 @@ fun ArtworkCard(
                         }
                     }
                 }
-
-                if (artwork.allVideoUrls.isNotEmpty() || artwork.allImageUrls.size > 1) {
-                    Text(
-                        text = "${artwork.allImageUrls.size} photos - ${artwork.allVideoUrls.size} videos",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }

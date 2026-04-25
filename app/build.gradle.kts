@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
+//    implementation("com.google.accompanist:accompanist-pager:0.34.0")
+//    implementation("com.google.accompanist:accompanist-pager-indicators:0.34.0")
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
