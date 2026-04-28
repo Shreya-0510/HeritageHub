@@ -2,31 +2,13 @@
 package com.example.heritagehub.ui.screens.artisan
 
 import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -36,14 +18,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.heritagehub.model.Artwork
-import com.example.heritagehub.model.CustomizationRequest
 import com.example.heritagehub.ui.components.ArtworkCard
 import com.example.heritagehub.ui.components.ShimmerArtworkList
+import com.example.heritagehub.util.capitalizeWords
 import com.example.heritagehub.viewmodel.AuthViewModel
 import com.example.heritagehub.viewmodel.ArtisanViewModel
 
 data class CustomizationRequestItem(
     val id: String,
+    val userName: String,
     val description: String,
     val budget: String,
     val deadline: String,
@@ -57,7 +40,8 @@ fun ArtisanDashboardScreen(
     context: Context? = null,
     onLogout: () -> Unit,
     onAddArtworkClick: () -> Unit = {},
-    onArtworkClick: (Artwork) -> Unit // <-- Add this parameter
+    onArtworkClick: (Artwork) -> Unit,
+    onManageProfileClick: () -> Unit = {}
 ) {
     val artisanViewModel: ArtisanViewModel = viewModel()
     val artworks = artisanViewModel.artworks.value
@@ -67,6 +51,7 @@ fun ArtisanDashboardScreen(
     LaunchedEffect(Unit) {
         artisanViewModel.refreshArtworks()
         artisanViewModel.refreshCustomizationRequests()
+        artisanViewModel.refreshArtisanProfile()
     }
 
     Scaffold(
@@ -81,6 +66,13 @@ fun ArtisanDashboardScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onManageProfileClick) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = "Manage Profile",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = {
                         if (context != null) {
                             viewModel.logout(context)
@@ -127,13 +119,8 @@ fun ArtisanDashboardScreen(
                     .padding(innerPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Padding for top section
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // Your Artworks Section Title
-                item {
                     Text(
                         text = "Your Artworks",
                         fontSize = 18.sp,
@@ -142,70 +129,42 @@ fun ArtisanDashboardScreen(
                     )
                 }
 
-                // Empty state or artwork items
                 if (artworks.isEmpty()) {
                     item {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "No artworks yet",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                            Text(
-                                text = "Click 'Add Artwork' to showcase your creations",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
+                            Text("No artworks yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 } else {
-                    // Artwork Grid Items
                     items(artworks.chunked(2)) { rowArtworks ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             rowArtworks.forEach { artwork ->
                                 ArtworkCard(
                                     artwork = artwork,
-                                    onClick = { onArtworkClick(artwork) }, // <-- Add this
+                                    onClick = { onArtworkClick(artwork) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
-                            // Add spacer if odd number of items
-                            if (rowArtworks.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
+                            if (rowArtworks.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Incoming Requests Section Title
-                item {
                     Text(
                         text = "Incoming Requests",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
                     )
                 }
 
-                // Request Cards
                 if (incomingRequests.isEmpty()) {
                     item {
                         Text(
@@ -220,21 +179,20 @@ fun ArtisanDashboardScreen(
                         RequestCard(
                             request = CustomizationRequestItem(
                                 id = request.id,
+                                userName = request.userName,
                                 description = request.description,
                                 budget = request.budget,
                                 deadline = request.deadline,
                                 status = request.status
                             ),
+                            onStatusUpdate = { newStatus ->
+                                artisanViewModel.updateRequestStatus(request.id, newStatus)
+                            },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Add Artwork Button
                 item {
                     Button(
                         onClick = onAddArtworkClick,
@@ -242,20 +200,10 @@ fun ArtisanDashboardScreen(
                             .fillMaxWidth()
                             .height(48.dp)
                             .padding(horizontal = 16.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        shape = MaterialTheme.shapes.medium
                     ) {
-                        Text(
-                            text = "+ Add Artwork",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("+ Add Artwork", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
-                }
-
-                item {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
@@ -266,14 +214,13 @@ fun ArtisanDashboardScreen(
 @Composable
 private fun RequestCard(
     request: CustomizationRequestItem,
+    onStatusUpdate: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -285,83 +232,56 @@ private fun RequestCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Capitalize the username here
+                val displayName = request.userName.ifBlank { "Unknown User" }.capitalizeWords()
                 Text(
-                    text = "Request #${request.id.takeLast(6)}",
+                    text = "Request from $displayName",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = request.status,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = request.status.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
                     color = when (request.status.lowercase()) {
                         "pending" -> MaterialTheme.colorScheme.error
-                        "in_progress", "in progress" -> MaterialTheme.colorScheme.tertiary
-                        "completed" -> MaterialTheme.colorScheme.primary
+                        "accepted" -> MaterialTheme.colorScheme.primary
+                        "declined" -> MaterialTheme.colorScheme.outline
                         else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
             }
 
-            Text(
-                text = request.description,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
-            )
+            Text(text = request.description, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Bottom
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "Budget: ${request.budget}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Deadline: ${request.deadline}",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column {
+                    Text("Budget: ${request.budget}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Deadline: ${request.deadline}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { /* Handle accept */ },
-                        modifier = Modifier.height(32.dp),
-                        shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "Accept",
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Button(
-                        onClick = { /* Handle decline */ },
-                        modifier = Modifier.height(32.dp),
-                        shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "Decline",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                if (request.status.lowercase() == "pending") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onStatusUpdate("accepted") },
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Accept", fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = { onStatusUpdate("declined") },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Decline", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
                     }
                 }
             }

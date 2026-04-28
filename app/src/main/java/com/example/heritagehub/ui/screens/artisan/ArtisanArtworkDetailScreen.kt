@@ -1,7 +1,9 @@
+@file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.artisan
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,7 +13,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.heritagehub.model.Artwork
@@ -36,72 +40,116 @@ fun ArtisanArtworkDetailScreen(
             )
         }
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Image carousel (read-only)
-            ImageCarouselReadOnly(imageUrls = artwork.allImageUrls, title = artwork.title)
-            OutlinedTextField(
-                value = artwork.title,
-                onValueChange = {},
-                label = { Text("Title") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = artwork.description,
-                onValueChange = {},
-                label = { Text("Description") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = artwork.category,
-                onValueChange = {},
-                label = { Text("Category") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = artwork.price,
-                onValueChange = {},
-                label = { Text("Price") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = artwork.customizationAvailable,
-                    onCheckedChange = {},
-                    enabled = false
-                )
-                Text("Customization Available")
+            item {
+                ImageCarouselReadOnly(imageUrls = artwork.allImageUrls, title = artwork.title)
             }
-            // Videos
-            if (artwork.allVideoUrls.isNotEmpty()) {
-                Text("Videos:", style = MaterialTheme.typography.labelLarge)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    artwork.allVideoUrls.forEach { url ->
-                        OutlinedTextField(
-                            value = url,
-                            onValueChange = {},
-                            label = { Text("Video URL") },
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+
+            item {
+                Text(
+                    text = artwork.title,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(8.dp)
+                    ) {
+                        Text(artwork.category)
+                    }
+
+                    if (artwork.customizationAvailable) {
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(8.dp)
+                        ) {
+                            Text("✓ Customization Enabled")
+                        }
                     }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            Button(
-                onClick = onEdit,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Edit Artwork")
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Your Price")
+                    Text(
+                        artwork.price,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Description", fontWeight = FontWeight.SemiBold)
+                    Text(artwork.description)
+                }
+            }
+
+            if (artwork.allVideoUrls.isNotEmpty()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Attached Videos (${artwork.allVideoUrls.size})", fontWeight = FontWeight.SemiBold)
+                        // Simplified display for artisan to see their video URLs/status
+                        artwork.allVideoUrls.forEach { url ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = url.substringAfterLast("/"),
+                                    modifier = Modifier.padding(12.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Edit Artwork", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -114,9 +162,9 @@ private fun ImageCarouselReadOnly(imageUrls: List<String>, title: String) {
             item {
                 Box(
                     modifier = Modifier
-                        .height(220.dp)
-                        .width(180.dp)
-//                        .clip(RoundedCornerShape(16.dp))
+                        .height(250.dp)
+                        .width(300.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -129,9 +177,10 @@ private fun ImageCarouselReadOnly(imageUrls: List<String>, title: String) {
                     model = imageUrl,
                     contentDescription = title,
                     modifier = Modifier
-                        .height(220.dp)
-                        .width(180.dp)
-//                        .clip(RoundedCornerShape(16.dp))
+                        .height(250.dp)
+                        .width(300.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             }
         }

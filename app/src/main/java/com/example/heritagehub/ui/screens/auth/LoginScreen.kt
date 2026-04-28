@@ -1,10 +1,7 @@
 @file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.auth
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,11 +25,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,9 +46,12 @@ fun LoginScreen(
     onNavigateToSignup: () -> Unit,
     onNavigateToForgotPassword: () -> Unit
 ) {
-    val selectedTab = remember { mutableStateOf(0) } // 0 = Email/Password, 1 = Mobile OTP
     val isLoading = viewModel.isLoading.value
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.loadSavedCredentials(context)
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -83,48 +83,14 @@ fun LoginScreen(
                     .padding(bottom = 24.dp)
             )
 
-            // Tab selection
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(28.dp)
-                    )
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                TabButton(
-                    text = "Email / Username",
-                    isSelected = selectedTab.value == 0,
-                    onClick = { selectedTab.value = 0 },
-                    modifier = Modifier.weight(1f)
-                )
-                TabButton(
-                    text = "Mobile OTP",
-                    isSelected = selectedTab.value == 1,
-                    onClick = { selectedTab.value = 1 },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (selectedTab.value == 0) {
-                EmailPasswordLoginTab(
-                    viewModel = viewModel,
-                    context = context,
-                    onLoginSuccess = onLoginSuccess,
-                    onNavigateToForgotPassword = onNavigateToForgotPassword
-                )
-            } else {
-                MobileOtpLoginTab(
-                    viewModel = viewModel,
-                    context = context,
-                    onLoginSuccess = onLoginSuccess
-                )
-            }
+            EmailPasswordLoginTab(
+                viewModel = viewModel,
+                context = context,
+                onLoginSuccess = onLoginSuccess,
+                onNavigateToForgotPassword = onNavigateToForgotPassword
+            )
 
             if (viewModel.error.value != null) {
                 Text(
@@ -151,48 +117,20 @@ fun LoginScreen(
 }
 
 @Composable
-fun TabButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                color = if (isSelected)
-                    MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isSelected)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-fun EmailPasswordLoginTab(
+private fun EmailPasswordLoginTab(
     viewModel: AuthViewModel,
     context: android.content.Context,
     onLoginSuccess: () -> Unit,
     onNavigateToForgotPassword: () -> Unit
 ) {
-    val emailOrUsername = remember { mutableStateOf("") }
+    val emailOrUsername = remember(viewModel.savedIdentifier.value) { 
+        mutableStateOf(viewModel.savedIdentifier.value) 
+    }
     val password = remember { mutableStateOf("") }
     val showPassword = remember { mutableStateOf(false) }
-    val rememberMe = remember { mutableStateOf(false) }
+    val rememberMe = remember(viewModel.isRememberMeChecked.value) { 
+        mutableStateOf(viewModel.isRememberMeChecked.value) 
+    }
     val isLoading = viewModel.isLoading.value
 
     OutlinedTextField(
@@ -285,118 +223,3 @@ fun EmailPasswordLoginTab(
         }
     }
 }
-
-@Composable
-fun MobileOtpLoginTab(
-    viewModel: AuthViewModel,
-    context: android.content.Context,
-    onLoginSuccess: () -> Unit
-) {
-    val phoneNumber = remember { mutableStateOf("") }
-    val otp = remember { mutableStateOf("") }
-    val showOtpInput = remember { mutableStateOf(false) }
-    val isLoading = viewModel.isLoading.value
-    val activity = (context as? android.app.Activity)
-
-    if (!showOtpInput.value) {
-        OutlinedTextField(
-            value = phoneNumber.value,
-            onValueChange = { phoneNumber.value = it },
-            label = { Text("Mobile Number") },
-            placeholder = { Text("+1 (555) 000-0000") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            enabled = !isLoading,
-            singleLine = true,
-            prefix = { Text("+") }
-        )
-
-        Button(
-            onClick = {
-                if (phoneNumber.value.isNotEmpty() && activity != null) {
-                    viewModel.requestPhoneOtp(
-                        phoneNum = "+${phoneNumber.value.filter { it.isDigit() }}",
-                        activity = activity,
-                        onCodeSent = { showOtpInput.value = true }
-                    )
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            enabled = !isLoading && phoneNumber.value.isNotEmpty()
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.padding(4.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Send OTP")
-            }
-        }
-    } else {
-        OutlinedTextField(
-            value = otp.value,
-            onValueChange = { otp.value = it.take(6) },
-            label = { Text("Verification Code") },
-            placeholder = { Text("000000") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            enabled = !isLoading,
-            singleLine = true
-        )
-
-        Button(
-            onClick = {
-                if (otp.value.length == 6) {
-                    viewModel.loginWithPhoneOtp(
-                        code = otp.value,
-                        context = context,
-                        onSuccess = onLoginSuccess
-                    )
-                } else {
-                    viewModel.error.value = "Please enter a valid 6-digit code"
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            enabled = !isLoading && otp.value.length == 6
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.padding(4.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Verify & Sign In")
-            }
-        }
-
-        TextButton(
-            onClick = {
-                showOtpInput.value = false
-                phoneNumber.value = ""
-                otp.value = ""
-            },
-            enabled = !isLoading
-        ) {
-            Text("Use different number", fontSize = 12.sp)
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

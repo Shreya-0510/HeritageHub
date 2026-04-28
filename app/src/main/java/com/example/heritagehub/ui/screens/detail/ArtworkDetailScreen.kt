@@ -36,6 +36,8 @@ import androidx.media3.ui.PlayerView
 import com.example.heritagehub.viewmodel.CartViewModel
 import com.example.heritagehub.viewmodel.HomeViewModel
 import coil.compose.AsyncImage
+import com.example.heritagehub.util.capitalizeWords
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,9 +113,11 @@ fun ArtworkDetailScreen(
             }
 
             item {
+                // Capitalized Artist Name
                 Text(
-                    text = "by ${artwork.artistName}",
+                    text = "by ${artwork.artistName.capitalizeWords()}",
                     color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.clickable {
                         onNavigateToProfile(artwork.artistName)
                     }
@@ -185,18 +189,12 @@ fun ArtworkDetailScreen(
                 }
             }
 
-            item {
-                Column {
-                    Text("About the Artist", fontWeight = FontWeight.SemiBold)
-                    Text("${artwork.artistName} is a talented artisan.")
-                }
-            }
+
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = {
-                            // Keep the original Buy Now intent: add item then jump to cart.
                             cartViewModel.addToCart(artwork) { success ->
                                 if (success) {
                                     onNavigateToCart()
@@ -316,7 +314,7 @@ private fun FullscreenVideoDialog(
     val player = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(buildMediaItem(videoUrl))
-            playWhenReady = false
+            playWhenReady = true
             repeatMode = Player.REPEAT_MODE_OFF
             prepare()
         }
@@ -325,7 +323,7 @@ private fun FullscreenVideoDialog(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                playbackError = error.message ?: "Unsupported video format on this device"
+                playbackError = error.localizedMessage ?: "Unsupported video format"
             }
         }
         player.addListener(listener)
@@ -367,7 +365,7 @@ private fun FullscreenVideoDialog(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = "Unsupported on this device. Try MP4/WebM/MKV.",
+                            text = "Playback Error: $playbackError",
                             modifier = Modifier.padding(12.dp),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             style = MaterialTheme.typography.bodySmall
@@ -381,27 +379,22 @@ private fun FullscreenVideoDialog(
 
 private fun buildMediaItem(videoUrl: String): MediaItem {
     val uri = Uri.parse(videoUrl)
-    val extFromUrl = MimeTypeMap.getFileExtensionFromUrl(videoUrl).lowercase()
-    val extFromPath = uri.path?.substringAfterLast('.', "")?.lowercase().orEmpty()
-    val ext = if (extFromUrl.isNotBlank()) extFromUrl else extFromPath
-
-    val mimeType = when (ext) {
-        "mp4", "m4v" -> "video/mp4"
-        "webm" -> "video/webm"
-        "mkv" -> "video/x-matroska"
-        "3gp" -> "video/3gpp"
-        "mov" -> "video/quicktime"
-        "avi" -> "video/x-msvideo"
-        "ts" -> "video/mp2t"
-        "m3u8" -> "application/x-mpegURL"
-        "mpd" -> "application/dash+xml"
-        else -> "video/*"
+    // For local files, Media3 works best when you let it detect the container automatically.
+    // Explicitly setting MIME type often breaks things if the file extension doesn't match perfectly.
+    return if (uri.scheme == "file" || videoUrl.startsWith("/")) {
+        MediaItem.fromUri(uri)
+    } else {
+        val ext = MimeTypeMap.getFileExtensionFromUrl(videoUrl).lowercase()
+        val mimeType = when (ext) {
+            "mp4", "m4v" -> "video/mp4"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            else -> null
+        }
+        val builder = MediaItem.Builder().setUri(uri)
+        if (mimeType != null) builder.setMimeType(mimeType)
+        builder.build()
     }
-
-    return MediaItem.Builder()
-        .setUri(uri)
-        .setMimeType(mimeType)
-        .build()
 }
 
 @Composable

@@ -7,34 +7,37 @@ import kotlinx.coroutines.tasks.await
 class ArtisanRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
+    private fun readStringList(raw: Any?): List<String> {
+        return (raw as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+    }
+
     suspend fun getArtisans(): List<Artisan> {
-        val snapshot = firestore.collection("artworks").get().await()
+        // Fetch all users with role 'artisan'
+        val userSnapshot = firestore.collection("users")
+            .whereEqualTo("role", "artisan")
+            .get()
+            .await()
 
-        val grouped = snapshot.documents.groupBy { doc ->
-            val artistId = doc.getString("artistId").orEmpty()
-            val artistName = doc.getString("artistName").orEmpty()
-            if (artistId.isNotBlank()) artistId else artistName
-        }
+        // Fetch all artworks to calculate counts
+        val artworkSnapshot = firestore.collection("artworks").get().await()
+        val artworkCounts = artworkSnapshot.documents
+            .groupBy { it.getString("artistId") ?: "" }
+            .mapValues { it.value.size }
 
-        return grouped.values.mapNotNull { docs ->
-            val first = docs.firstOrNull() ?: return@mapNotNull null
-            val artistName = first.getString("artistName").orEmpty()
-            if (artistName.isBlank()) return@mapNotNull null
-
-            val categories = docs
-                .mapNotNull { it.getString("category") }
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .sorted()
-
+        return userSnapshot.documents.map { doc ->
+            val artisanId = doc.id
+            val skills = readStringList(doc.get("skills"))
+            
             Artisan(
-                artistId = first.getString("artistId").orEmpty(),
-                artistName = artistName,
-                categories = categories,
-                artworkCount = docs.size
+                artistId = artisanId,
+                artistName = doc.getString("username").orEmpty(),
+                profilePicUrl = doc.getString("profilePicUrl").orEmpty(),
+                description = doc.getString("description").orEmpty(),
+                skills = skills,
+                categories = skills, // Using skills as categories for search if needed
+                artworkCount = artworkCounts[artisanId] ?: 0,
+                location = doc.getString("location").orEmpty()
             )
         }.sortedBy { it.artistName.lowercase() }
     }
 }
-

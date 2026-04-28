@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import com.example.heritagehub.model.Artisan
 import com.example.heritagehub.model.Artwork
 import com.example.heritagehub.model.CustomizationRequest
 import com.google.firebase.auth.FirebaseAuth
@@ -16,6 +17,7 @@ class ArtisanViewModel : ViewModel() {
     val artworks = mutableStateOf<List<Artwork>>(emptyList())
     val requests = mutableStateOf<List<CustomizationRequest>>(emptyList())
     val isLoading = mutableStateOf(false)
+    val currentArtisan = mutableStateOf<Artisan?>(null)
 
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -27,7 +29,29 @@ class ArtisanViewModel : ViewModel() {
     init {
         refreshArtworks()
         refreshCustomizationRequests()
+        refreshArtisanProfile()
     }
+
+    fun refreshArtisanProfile() {
+        val currentUserId = auth.currentUser?.uid ?: return
+        
+        firestore.collection("users").document(currentUserId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (documentExists(doc)) {
+                    currentArtisan.value = Artisan(
+                        artistId = doc.id,
+                        artistName = doc.getString("username").orEmpty(),
+                        profilePicUrl = doc.getString("profilePicUrl").orEmpty(),
+                        description = doc.getString("description").orEmpty(),
+                        skills = readStringList(doc.get("skills")),
+                        location = doc.getString("location").orEmpty()
+                    )
+                }
+            }
+    }
+
+    private fun documentExists(doc: com.google.firebase.firestore.DocumentSnapshot): Boolean = doc.exists()
 
     fun refreshArtworks() {
         isLoading.value = true
@@ -87,6 +111,7 @@ class ArtisanViewModel : ViewModel() {
                         artistId = doc.getString("artistId").orEmpty(),
                         artistName = doc.getString("artistName").orEmpty(),
                         userId = doc.getString("userId").orEmpty(),
+                        userName = doc.getString("userName").orEmpty(),
                         description = doc.getString("description").orEmpty(),
                         budget = doc.getString("budget").orEmpty(),
                         deadline = doc.getString("deadline").orEmpty(),
@@ -97,6 +122,56 @@ class ArtisanViewModel : ViewModel() {
             .addOnFailureListener {
                 requests.value = emptyList()
             }
+    }
+
+    fun updateRequestStatus(requestId: String, newStatus: String) {
+        firestore.collection("customization_requests").document(requestId)
+            .update("status", newStatus)
+            .addOnSuccessListener {
+                refreshCustomizationRequests()
+            }
+    }
+
+    suspend fun updateProfile(
+        context: Context,
+        profilePicUri: Uri?,
+        description: String,
+        skills: List<String>,
+        location: String
+    ): Result<Unit> {
+        val currentUserId = auth.currentUser?.uid
+            ?: return Result.failure(IllegalStateException("User is not logged in"))
+
+        isLoading.value = true
+        return try {
+            val updateMap = mutableMapOf<String, Any>(
+                "description" to description,
+                "skills" to skills,
+                "location" to location
+            )
+
+            if (profilePicUri != null && profilePicUri.scheme != "http" && profilePicUri.scheme != "https") {
+                val localUri = copyUriToLocalFile(
+                    context = context,
+                    sourceUri = profilePicUri,
+                    artistId = currentUserId,
+                    artworkId = "profile",
+                    folder = "images",
+                    fallbackExtension = "jpg"
+                )
+                updateMap["profilePicUrl"] = localUri.toString()
+            }
+
+            firestore.collection("users").document(currentUserId)
+                .update(updateMap).await()
+            
+            refreshArtisanProfile()
+            isLoading.value = false
+            Result.success(Unit)
+        } catch (e: Exception) {
+            isLoading.value = false
+            Result.failure(e)
+        }
     }
 
     suspend fun addArtwork(
@@ -215,10 +290,6 @@ class ArtisanViewModel : ViewModel() {
         }
 
         return Uri.fromFile(outputFile)
-    }
-
-    fun getArtworks(): List<Artwork> {
-        return artworks.value
     }
 
     suspend fun updateArtwork(

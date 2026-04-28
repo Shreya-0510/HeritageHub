@@ -13,9 +13,12 @@ import com.example.heritagehub.model.CartItem
 import com.example.heritagehub.model.CartSummary
 import com.example.heritagehub.model.CheckoutPreferences
 import com.example.heritagehub.model.Order
+import com.example.heritagehub.model.CustomizationRequest
 import com.example.heritagehub.util.LocationUtils
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.ViewModel
@@ -25,6 +28,9 @@ class CartViewModel(
     private val repository: CartRepository = CartRepository(),
     private val appContext: Context? = null
 ) : ViewModel() {
+
+    private val auth = FirebaseAuth.getInstance()
+    private val firestore = FirebaseFirestore.getInstance()
 
     private val _items = mutableStateOf<List<CartItem>>(emptyList())
     val items: State<List<CartItem>> = _items
@@ -47,6 +53,9 @@ class CartViewModel(
     private val _orders = mutableStateOf<List<Order>>(emptyList())
     val orders: State<List<Order>> = _orders
 
+    private val _userRequests = mutableStateOf<List<CustomizationRequest>>(emptyList())
+    val userRequests: State<List<CustomizationRequest>> = _userRequests
+
     private val _isLoadingOrders = mutableStateOf(false)
     val isLoadingOrders: State<Boolean> = _isLoadingOrders
 
@@ -58,6 +67,8 @@ class CartViewModel(
     init {
         refreshCart()
         refreshCheckoutPreferences()
+        refreshOrders()
+        refreshUserRequests()
     }
 
     fun refreshCart() {
@@ -73,6 +84,28 @@ class CartViewModel(
                 _isLoading.value = false
             }
         }
+    }
+
+    fun refreshUserRequests() {
+        val userId = auth.currentUser?.uid ?: return
+        firestore.collection("customization_requests")
+            .whereEqualTo("userId", userId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                _userRequests.value = snapshot.documents.map { doc ->
+                    CustomizationRequest(
+                        id = doc.id,
+                        artistId = doc.getString("artistId").orEmpty(),
+                        artistName = doc.getString("artistName").orEmpty(),
+                        userId = doc.getString("userId").orEmpty(),
+                        userName = doc.getString("userName").orEmpty(),
+                        description = doc.getString("description").orEmpty(),
+                        budget = doc.getString("budget").orEmpty(),
+                        deadline = doc.getString("deadline").orEmpty(),
+                        status = doc.getString("status") ?: "pending"
+                    )
+                }
+            }
     }
 
     fun addToCart(

@@ -13,6 +13,8 @@ class ArtisanDirectoryViewModel(
 ) : ViewModel() {
 
     private val _allArtisans = mutableStateOf<List<Artisan>>(emptyList())
+    val allArtisans: State<List<Artisan>> = _allArtisans
+
     private val _visibleArtisans = mutableStateOf<List<Artisan>>(emptyList())
     val visibleArtisans: State<List<Artisan>> = _visibleArtisans
 
@@ -55,14 +57,16 @@ class ArtisanDirectoryViewModel(
     private fun applyFilter(rawQuery: String) {
         val query = rawQuery.trim().lowercase()
         if (query.isBlank()) {
-            _visibleArtisans.value = _allArtisans.value
+            // Initially show 5 artisans in the visible list
+            _visibleArtisans.value = _allArtisans.value.take(5)
             return
         }
 
+        // Show all matches when user starts typing
         _visibleArtisans.value = _allArtisans.value.filter { artisan ->
             artisan.artistName.lowercase().contains(query) ||
-                artisan.categories.any { it.lowercase().contains(query) }
+                artisan.categories.any { it.lowercase().contains(query) } ||
+                artisan.skills.any { it.lowercase().contains(query) }
         }
     }
 }
-

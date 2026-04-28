@@ -1,34 +1,13 @@
 @file:Suppress("EXPERIMENTAL_API_USAGE")
 package com.example.heritagehub.ui.screens.customization
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.heritagehub.viewmodel.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -48,6 +28,7 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun CustomizationRequestScreen(
     artistName: String,
+    authViewModel: AuthViewModel,
     onBack: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -56,7 +37,6 @@ fun CustomizationRequestScreen(
     val firestore = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
 
-    // Form state
     val description = remember { mutableStateOf("") }
     val budget = remember { mutableStateOf("") }
     val deadline = remember { mutableStateOf("") }
@@ -71,15 +51,10 @@ fun CustomizationRequestScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         },
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
-        }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -88,242 +63,114 @@ fun CustomizationRequestScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header
             item {
-                HeaderSection(artistName = artistName)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "Customize with $artistName", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "The artist will review your request and get back to you.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
-            // Description Field
             item {
-                DescriptionField(
+                OutlinedTextField(
                     value = description.value,
-                    onValueChange = { description.value = it }
+                    onValueChange = { description.value = it },
+                    label = { Text("Customization Details") },
+                    placeholder = { Text("Describe what you want...") },
+                    modifier = Modifier.fillMaxWidth().height(150.dp),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
 
-            // Budget Field
             item {
-                BudgetField(
+                OutlinedTextField(
                     value = budget.value,
-                    onValueChange = { budget.value = it }
+                    onValueChange = { budget.value = it },
+                    label = { Text("Budget") },
+                    placeholder = { Text("e.g. $100 - $200") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
 
-            // Deadline Field
             item {
-                DeadlineField(
+                OutlinedTextField(
                     value = deadline.value,
-                    onValueChange = { deadline.value = it }
+                    onValueChange = { deadline.value = it },
+                    label = { Text("Deadline") },
+                    placeholder = { Text("e.g. 2 weeks") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
 
-            // Submit Button
             item {
-                SubmitButton(
-                    isLoading = isSubmitting.value,
+                Button(
                     onClick = {
-                        if (validateForm(description.value, budget.value, deadline.value)) {
+                        if (description.value.isNotBlank() && budget.value.isNotBlank() && deadline.value.isNotBlank()) {
                             isSubmitting.value = true
                             scope.launch {
                                 try {
-                                    val userId = auth.currentUser?.uid ?: return@launch
-                                    val artistId = resolveArtistId(firestore, artistName)
+                                    val user = auth.currentUser
+                                    if (user != null) {
+                                        // RELIABLE NAME RESOLUTION
+                                        val userDoc = firestore.collection("users").document(user.uid).get().await()
+                                        val firestoreName = userDoc.getString("username")
+                                        val viewModelName = authViewModel.userName.value
+                                        val emailName = user.email?.substringBefore("@")
+                                        
+                                        val resolvedName = when {
+                                            !firestoreName.isNullOrBlank() -> firestoreName
+                                            !viewModelName.isNullOrBlank() -> viewModelName
+                                            !emailName.isNullOrBlank() -> emailName
+                                            else -> "User"
+                                        }
 
-                                    if (artistId.isBlank()) {
-                                        isSubmitting.value = false
-                                        snackbarHostState.showSnackbar(
-                                            message = "Could not find artist account for $artistName",
-                                            duration = SnackbarDuration.Short
+                                        val artistId = resolveArtistId(firestore, artistName)
+                                        
+                                        val request = mapOf(
+                                            "artistId" to artistId,
+                                            "artistName" to artistName,
+                                            "userId" to user.uid,
+                                            "userName" to resolvedName,
+                                            "description" to description.value,
+                                            "budget" to budget.value,
+                                            "deadline" to deadline.value,
+                                            "status" to "pending",
+                                            "createdAt" to System.currentTimeMillis()
                                         )
-                                        return@launch
+
+                                        firestore.collection("customization_requests").add(request).await()
+                                        snackbarHostState.showSnackbar("Request sent to $artistName!")
+                                        onBack()
                                     }
-
-                                    val request = mapOf(
-                                        "artistId" to artistId,
-                                        "artistName" to artistName,
-                                        "description" to description.value,
-                                        "budget" to budget.value,
-                                        "deadline" to deadline.value,
-                                        "userId" to userId,
-                                        "status" to "pending",
-                                        "createdAt" to System.currentTimeMillis()
-                                    )
-
-                                    firestore.collection("customization_requests")
-                                        .add(request)
-                                        .await()
-
-                                    snackbarHostState.showSnackbar(
-                                        message = "Customization request submitted successfully!",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    isSubmitting.value = false
-
-                                    kotlinx.coroutines.delay(500)
-                                    onBack()
                                 } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar("Error: ${e.message}")
+                                } finally {
                                     isSubmitting.value = false
-                                    snackbarHostState.showSnackbar(
-                                        message = "Error: ${e.message ?: "Failed to submit request"}",
-                                        duration = SnackbarDuration.Short
-                                    )
                                 }
                             }
                         } else {
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    message = "Please fill in all fields",
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
+                            scope.launch { snackbarHostState.showSnackbar("Please fill in all fields") }
                         }
-                    }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !isSubmitting.value,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isSubmitting.value) CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else Text("Send Request", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
-}
-
-@Composable
-private fun HeaderSection(artistName: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = "Customize with $artistName",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = "Fill out the form below to request a customization. The artist will review your request and get back to you.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            lineHeight = 20.sp
-        )
-    }
-}
-
-@Composable
-private fun DescriptionField(value: String, onValueChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Customization Request",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text("Describe your customization request") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
-            shape = RoundedCornerShape(12.dp),
-            minLines = 4,
-            maxLines = 6
-        )
-    }
-}
-
-@Composable
-private fun BudgetField(value: String, onValueChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Budget",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text("e.g., $500 - $1000") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
-        )
-    }
-}
-
-@Composable
-private fun DeadlineField(value: String, onValueChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Deadline",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text("e.g., 2 weeks, 1 month") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
-    }
-}
-
-@Composable
-private fun SubmitButton(isLoading: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = !isLoading,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Submitting...", fontWeight = FontWeight.SemiBold)
-            }
-        } else {
-            Text("Submit Customization", fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-private fun validateForm(description: String, budget: String, deadline: String): Boolean {
-    return description.isNotBlank() && budget.isNotBlank() && deadline.isNotBlank()
 }
 
 private suspend fun resolveArtistId(firestore: FirebaseFirestore, artistName: String): String {
-    val userDoc = firestore.collection("users")
+    return firestore.collection("users")
         .whereEqualTo("username", artistName)
         .limit(1)
         .get()
         .await()
         .documents
-        .firstOrNull()
-
-    if (userDoc != null) {
-        return userDoc.id
-    }
-
-    val artworkDoc = firestore.collection("artworks")
-        .whereEqualTo("artistName", artistName)
-        .limit(1)
-        .get()
-        .await()
-        .documents
-        .firstOrNull()
-
-    return artworkDoc?.getString("artistId").orEmpty()
+        .firstOrNull()?.id ?: ""
 }
-

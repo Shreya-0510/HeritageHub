@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -38,12 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.example.heritagehub.viewmodel.AuthViewModel
 
 @Composable
-fun SignupInitialScreen(
+fun SignupScreen(
     viewModel: AuthViewModel,
-    onProceed: (username: String, email: String) -> Unit,
-    onNavigateToLogin: () -> Unit,
-    onContinueWithPhone: (username: String, email: String, role: String) -> Unit = { _, _, _ -> },
-    onContinueWithGoogle: (username: String, email: String, role: String) -> Unit = { _, _, _ -> }
+    onProceed: () -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
     val username = remember { mutableStateOf("") }
     val email = remember { mutableStateOf("") }
@@ -279,7 +276,7 @@ fun SignupInitialScreen(
                                 confirmPassword.value,
                                 selectedRole.value
                             ) {
-                                onProceed(username.value, email.value)
+                                onProceed()
                             }
                         }
                     } else if (usernameAvailable.value != true) {
@@ -301,59 +298,9 @@ fun SignupInitialScreen(
                 }
             }
 
-            Text(
-                text = "Or continue with",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            // ==================== CONTINUE WITH PHONE BUTTON ====================
-            OutlinedButton(
-                onClick = {
-                    if (usernameAvailable.value == true && email.value.isNotEmpty() && username.value.isNotEmpty()) {
-                        onContinueWithPhone(username.value, email.value, selectedRole.value)
-                    } else if (usernameAvailable.value != true) {
-                        viewModel.error.value = "Please choose an available username"
-                    } else {
-                        viewModel.error.value = "Please fill in username and email"
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                enabled = !isLoading && usernameAvailable.value == true && email.value.isNotEmpty()
-            ) {
-                Text("Phone")
-            }
-
-            // ==================== CONTINUE WITH GOOGLE BUTTON ====================
-            OutlinedButton(
-                onClick = {
-                    if (usernameAvailable.value == true && email.value.isNotEmpty() && username.value.isNotEmpty()) {
-                        onContinueWithGoogle(username.value, email.value, selectedRole.value)
-                    } else if (usernameAvailable.value != true) {
-                        viewModel.error.value = "Please choose an available username"
-                    } else {
-                        viewModel.error.value = "Please fill in username and email"
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                enabled = !isLoading && usernameAvailable.value == true && email.value.isNotEmpty()
-            ) {
-                Text("Google")
-            }
-
             TextButton(onClick = onNavigateToLogin, enabled = !isLoading, modifier = Modifier.padding(top = 12.dp)) {
                 Text("Already have an account? Sign in")
             }
         }
     }
 }
-
-
-
